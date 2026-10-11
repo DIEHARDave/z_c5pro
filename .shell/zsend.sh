@@ -38,7 +38,23 @@ if [ $# -eq 1 ]; then
     /bin/echo -e "$RET"
 fi
 
+send_data()
+{
+    RET=$(${PYTHON} /usr/data/zmod/zmod/.shell/zsend.py "M23" "$2" 2>&1)
+    if [ $? -ne 0 ]; then
+        [ ${ZLANG} != 'ru' ] && echo "Error sending message to native screen. Is it working?" || echo "Ошибка передачи сообщения на родной экран. Он у вас работает?"
+    fi
+    /bin/echo -e "$RET"
+}
+
 if [ $# -eq 2 ]; then
+    case "$2" in
+        *".3mf")
+            send_data "$1" "$2"
+            exit 0
+            ;;
+    esac
+
     M109=$(head -1000 "${DATA_GCODES}/$2" | grep "^M109" | head -1)
     [ "$M109" == "" ] && M109=$(head -1000 "${DATA_GCODES}/$2" | grep "^M104" | head -1 | sed 's|M104|M109|')
     M190=$(head -1000 "${DATA_GCODES}/$2" | grep "^M190" | head -1)
@@ -52,10 +68,6 @@ if [ $# -eq 2 ]; then
         fi
         exit 1
     else
-        RET=$(${PYTHON} /usr/data/zmod/zmod/.shell/zsend.py "M23" "$2" 2>&1)
-        if [ $? -ne 0 ]; then
-            [ ${ZLANG} != 'ru' ] && echo "Error sending message to native screen. Is it working?" || echo "Ошибка передачи сообщения на родной экран. Он у вас работает?"
-        fi
-        /bin/echo -e "$RET"
+        send_data "$1" "$2"
     fi
 fi
