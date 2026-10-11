@@ -1740,80 +1740,6 @@ class zmod_color:
         """Перцептуальное расстояние ΔE76"""
         return ((l1 - l2) ** 2 + (a1 - a2) ** 2 + (b1 - b2) ** 2) ** 0.5
 
-    def update_metadata_async(self, filename):
-        """Запускает повторное сканирование метаданных в Moonraker, не блокируя реактор."""
-        encoded = urllib.parse.quote(filename, safe="")
-        url = "http://127.0.0.1:7125/server/files/metascan?filename=" + encoded
-
-        def _worker():
-            req = urllib.request.Request(url, method="POST")
-            try:
-                with urllib.request.urlopen(req, timeout=30):
-                    pass
-            except Exception:
-                pass
-
-        threading.Thread(target=_worker, daemon=True).start()
-
-    def _extract_3mf_gcode(self, fname, gcmd):
-        if not fname.lower().endswith('.3mf'):
-            return fname
-
-        src_3mf_path = f"/usr/data/gcodes/{fname}"
-        p = Path(fname)
-        clean_name = p.stem if p.stem.lower().endswith('.gcode') else f"{p.stem}.gcode"
-        target_gcode_path = f"/usr/data/gcodes/3mf_print/{clean_name}"
-
-        os.makedirs(os.path.dirname(target_gcode_path), exist_ok=True)
-
-        try:
-            with ZipFile(src_3mf_path, 'r') as zip_ref:
-                file_list = zip_ref.namelist()
-
-                internal_gcode_names = [f for f in file_list if f.lower().endswith('.gcode')]
-                if not internal_gcode_names:
-                    raise ValueError("NO_GCODE")
-
-                internal_gcode_names.sort()
-                gcode_in_zip = internal_gcode_names[0]
-
-                expected_md5 = None
-                md5_file_path = gcode_in_zip + ".md5"
-                if md5_file_path in file_list:
-                    raw_md5_content = zip_ref.read(md5_file_path).decode('utf-8', errors='ignore').strip()
-                    if raw_md5_content:
-                        expected_md5 = raw_md5_content.split()[0].lower()
-
-                # Потоковое чтение и запись чанками по 16КБ для экономии ОЗУ
-                md5_hash = hashlib.md5()
-                with zip_ref.open(gcode_in_zip) as source, open(target_gcode_path, 'wb') as target:
-                    while True:
-                        chunk = source.read(16384)
-                        if not chunk:
-                            break
-                        target.write(chunk)
-                        md5_hash.update(chunk)
-
-                current_md5 = md5_hash.hexdigest().lower()
-
-                # Если хеш не совпал с тем, что в архиве — удаляем битый файл с диска
-                if expected_md5 and current_md5 != expected_md5:
-                    if os.path.exists(target_gcode_path):
-                        os.remove(target_gcode_path)
-                    raise ValueError("MD5_MISMATCH")
-
-                self.update_metadata_async(f"3mf_print/{clean_name}")
-
-            return f"3mf_print/{clean_name}"
-        except Exception as e:
-            if str(e) == "NO_GCODE":
-                err = "!! Ошибка 3MF: Внутри архива не найден файл G-кода" if self.lang == 'ru' else "!! 3MF Error: No G-code file found inside the archive"
-            elif str(e) == "MD5_MISMATCH":
-                err = "!! Ошибка MD5: Контрольная сумма gcode не совпадает с файлом .md5 в 3MF" if self.lang == 'ru' else "!! MD5 Error: Extracted G-code hash does not match the internal .md5 file"
-            else:
-                err = f"!! Ошибка распаковки архива 3MF: {str(e)}" if self.lang == 'ru' else f"!! 3MF unpack error: {str(e)}"
-            raise gcmd.error(err)
-
     def _parse_3mf_filament(self, file_path):
         """Парсит 3MF архив и извлекает данные о филаментах из метаданных Orca/Bambu Slicer."""
         from zipfile import ZipFile
@@ -2352,7 +2278,7 @@ class zmod_color:
                 else:
                     gcmd.respond_raw(self._t('printing_error', response_data2))
             else:
-                fname = self._extract_3mf_gcode(fname, gcmd)
+                fname = self.zmod._extract_3mf_gcode(fname, gcmd)
                 file_channel, bed_temp = self.find_t_code(fname)
                 t_start = tools[file_channel] - 1
 
