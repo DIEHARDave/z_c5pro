@@ -32,6 +32,7 @@ class zmod:
         self.gcode.register_command('ZEXCLUDE', self.cmd_ZEXCLUDE)
         self.gcode.register_command('LOAD_ZOFFSET_NATIVE', self.cmd_LOAD_ZOFFSET_NATIVE)
         self.gcode.register_command('SDCARD_PRINT_FILE_MF', self.cmd_SDCARD_PRINT_FILE_MF)
+        self.gcode.register_command('ZEXCLUDE_MF', self.cmd_ZEXCLUDE_MF)
 
         self.printer.register_event_handler("klippy:ready", self._handle_ready)
 
@@ -120,6 +121,61 @@ class zmod:
             else:
                 err = f"!! Ошибка распаковки архива 3MF: {str(e)}" if self.lang == 'ru' else f"!! 3MF unpack error: {str(e)}"
             raise gcmd.error(err)
+
+    def cmd_ZEXCLUDE_MF(self, gcmd):
+        filename = gcmd.get("FILENAME", None)
+        if not filename:
+            gcmd.respond_raw("ZEXCLUDE_MF: FILENAME is required")
+            return
+
+        if filename.startswith('/'):
+            filename = filename[1:]
+        full_path = os.path.join(self.sdcard_dirname, filename)
+
+        if not full_path.lower().endswith('.3mf'):
+            gcmd.respond_raw("ZEXCLUDE_MF: File must be a .3mf archive")
+            return
+
+        try:
+            with ZipFile(full_path, 'r') as zip_ref:
+                file_list = zip_ref.namelist()
+
+                config_file = 'Metadata/slice_info.config'
+                if config_file not in file_list:
+                    gcmd.respond_raw(f"ZEXCLUDE_MF: Configuration file '{config_file}' not found inside 3MF")
+                    return
+
+                raw_content = zip_ref.read(config_file).decode('utf-8', errors='ignore')
+                data = json.loads(raw_content)
+
+                bbox_all = data.get("bbox_all", None)
+                if not bbox_all or len(bbox_all) != 4:
+                    gcmd.respond_raw("ZEXCLUDE_MF: 'bbox_all' valid data not found in slice_info.config")
+                    return
+
+                x_min, y_min, x_max, y_max = float(bbox_all[0]), float(bbox_all[1]), float(bbox_all[2]), float(bbox_all[3])
+
+                x_center = (x_min + x_max) / 2.0
+                y_center = (y_min + y_max) / 2.0
+
+                exclude_cmd = (
+                    f"EXCLUDE_OBJECT_DEFINE NAME=border0 "
+                    f"CENTER={x_center:.4f},{y_center:.4f} "
+                    f"POLYGON=[[{x_min:.4f},{y_min:.4f}],[{x_min:.4f},{y_max:.4f}],[{x_max:.4f},{y_max:.4f}],[{x_max:.4f},{y_min:.4f}]]"
+                )
+
+                gcmd.respond_raw(f"ZEXCLUDE_MF: Defining border0 from 3MF metadata")
+                self.gcode.run_script_from_command(exclude_cmd)
+
+        except FileNotFoundError:
+            gcmd.respond_raw(f"ZEXCLUDE_MF: File not found: {full_path}")
+            logging.error(f"ZEXCLUDE_MF: File not found: {full_path}")
+        except json.JSONDecodeError:
+            gcmd.respond_raw("ZEXCLUDE_MF: Failed to parse JSON in slice_info.config")
+            logging.error("ZEXCLUDE_MF: JSON decode error")
+        except Exception as e:
+            logging.exception("zexclude_mf_error")
+            gcmd.respond_raw(f"ZEXCLUDE_MF: Unexpected error: {str(e)}")
 
     def get_lang(self):
         return self.lang
