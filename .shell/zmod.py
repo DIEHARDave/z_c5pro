@@ -140,7 +140,7 @@ class zmod:
             with ZipFile(full_path, 'r') as zip_ref:
                 file_list = zip_ref.namelist()
 
-                config_file = 'Metadata/slice_info.config'
+                config_file = 'Metadata/plate_1.json'
                 if config_file not in file_list:
                     gcmd.respond_raw(f"ZEXCLUDE_MF: Configuration file '{config_file}' not found inside 3MF")
                     return
