@@ -1,4 +1,16 @@
-.v-dialog__content .v-btn{
+v-dialog__content .v-btn{
   min-width: 32px !important;
   padding: 0 4px !important;
+  margin: 2px !important;
+}
+
+.v-dialog__content .v-btn .v-btn__content {
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow: visible !important;    
+    text-overflow: clip !important;
+
+    display: block !important;
+    width: 100% !important;
+    text-align: center !important;
 }
