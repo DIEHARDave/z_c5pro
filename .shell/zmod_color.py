@@ -625,6 +625,9 @@ class zmod_color:
     def __init__(self, config):
         self.printer = config.get_printer()
         self.color_limit = 4
+        # Tools of the last file SET_ZCOLOR scanned, as [tool, colour, type] entries. PRINT_ZCOLOR
+        # can be called without a scan (a slicer that maps the tools itself), so it starts empty.
+        self.file_colors = []
 
         self.saved_extruder = -1
         self.saved_temperature = 0.0
@@ -2026,7 +2029,7 @@ class zmod_color:
         else:
             status_code, response_data = self.get_printer_data_detail()
         if status_code:
-            allowed_tool_count = max(file_colors, key=lambda entry: entry[0])[0] + 1
+            allowed_tool_count = (max(file_colors, key=lambda entry: entry[0])[0] + 1) if file_colors else gcmd.get_int('ALLOWED_TOOL_COUNT', 1)
 
             result = self.parse_printer_response(response_data)
 
