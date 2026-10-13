@@ -2278,9 +2278,11 @@ class zmod_color:
                 else:
                     gcmd.respond_raw(self._t('printing_error', response_data2))
             else:
+                if len(tools) > self.EX_TABLE_SIZE:
+                    raise gcmd.error(f"The file uses tools up to T{len(tools) - 1}; the printer maps at most {self.EX_TABLE_SIZE} (T0-T{self.EX_TABLE_SIZE - 1})")
                 fname = self.zmod._extract_3mf_gcode(fname, gcmd)
                 file_channel, bed_temp = self.find_t_code(fname)
-                t_start = tools[file_channel] - 1
+                t_start = (tools[file_channel] if file_channel < len(tools) else file_channel % 4 + 1) - 1
 
                 self.physical_pa = [99.0, 99.0, 99.0, 99.0]
 
@@ -2296,15 +2298,7 @@ class zmod_color:
                     "SET_FAN_M106 ADJUSTED=0 FACTOR=0",
                     "SDCARD_NO_FILAMENT_CHECK_EX CHECK=0",
                     "SDCARD_SET_NEED_CHECK_EX CHECK=0",
-                    "SDCARD_SET_GCODE_EX_USED_BASE INDEX=0 EXTRUDER=T0",
-                    "SDCARD_SET_GCODE_EX_USED_BASE INDEX=1 EXTRUDER=T1",
-                    "SDCARD_SET_GCODE_EX_USED_BASE INDEX=2 EXTRUDER=T2",
-                    "SDCARD_SET_GCODE_EX_USED_BASE INDEX=3 EXTRUDER=T3"
-                ]
-
-                for idx in range(4):
-                    tool_val = tools[idx] if idx < len(tools) else (idx + 1)
-                    script.append(f"SDCARD_SET_GCODE_EX_USED_CHANGED INDEX={idx} EXTRUDER=T{tool_val-1}")
+                ] + self.ex_table_script(tools)
 
                 script.append("SDCARD_SET_NEED_CHECK_EX CHECK=1")
                 self.gcode.run_script_from_command("\n".join(script))
@@ -2332,6 +2326,28 @@ class zmod_color:
         else:
             gcmd.respond_raw(self._t('no_response', json.dumps(response_data)))
 
+    # Flashforge's virtual_sdcard maps file tools to heads through a table of this many
+    # (file tool, head) pairs, filled with SDCARD_SET_GCODE_EX_USED_BASE / _CHANGED. A tool number
+    # missing from the table falls back to head T<n % 4>.
+    EX_TABLE_SIZE = 6
+
+    def ex_table_script(self, tools):
+        # tools[i] is the 1-based slot for tool T<i> of the file. Every tool the file names is
+        # mapped, not only T0-T3, so a file with more colours than heads prints each one on the
+        # head it was assigned to. Entries past the file's tools keep T0-T3 on their own heads and
+        # clear the rest.
+        script = []
+        for idx in range(self.EX_TABLE_SIZE):
+            if idx < len(tools):
+                base, changed = f"T{idx}", f"T{tools[idx] - 1}"
+            elif idx < 4:
+                base, changed = f"T{idx}", f"T{idx}"
+            else:
+                base, changed = "T99", "T99"
+            script.append(f"SDCARD_SET_GCODE_EX_USED_BASE INDEX={idx} EXTRUDER={base}")
+            script.append(f"SDCARD_SET_GCODE_EX_USED_CHANGED INDEX={idx} EXTRUDER={changed}")
+        return script
+
     def find_t_code(self, filename):
         channel_num = 0
         bed_temp = 65.0
@@ -2352,7 +2368,7 @@ class zmod_color:
                     match = pattern.match(stripped_line)
                     if match:
                         parsed_channel = int(match.group(1))
-                        channel_num = parsed_channel if 0 <= parsed_channel < 4 else 0
+                        channel_num = parsed_channel if 0 <= parsed_channel < self.EX_TABLE_SIZE else 0
                         found_t = True
 
                 if not found_bed:
@@ -2967,15 +2983,8 @@ class zmod_color:
             script = [
                 "SDCARD_NO_FILAMENT_CHECK_EX CHECK=0",
                 "SDCARD_SET_NEED_CHECK_EX CHECK=0",
-                "SDCARD_SET_GCODE_EX_USED_BASE INDEX=0 EXTRUDER=T0",
-                "SDCARD_SET_GCODE_EX_USED_BASE INDEX=1 EXTRUDER=T1",
-                "SDCARD_SET_GCODE_EX_USED_BASE INDEX=2 EXTRUDER=T2",
-                "SDCARD_SET_GCODE_EX_USED_BASE INDEX=3 EXTRUDER=T3",
                 "SET_PA_ADVANCE T0=99.0 T1=99.0 T2=99.0 T3=99.0 ENABLE=0",
-            ]
-            for idx in range(4):
-                tool_val = tools[idx] if idx < len(tools) else (idx + 1)
-                script.append(f"SDCARD_SET_GCODE_EX_USED_CHANGED INDEX={idx} EXTRUDER=T{tool_val-1}")
+            ] + self.ex_table_script(tools)
 
             self.set_autopa(gcmd)
 
@@ -3142,15 +3151,7 @@ class zmod_color:
             "SET_FAN_M106 ADJUSTED=0 FACTOR=0",
             "SDCARD_NO_FILAMENT_CHECK_EX CHECK=0",
             "SDCARD_SET_NEED_CHECK_EX CHECK=0",
-            "SDCARD_SET_GCODE_EX_USED_BASE INDEX=0 EXTRUDER=T0",
-            "SDCARD_SET_GCODE_EX_USED_BASE INDEX=1 EXTRUDER=T1",
-            "SDCARD_SET_GCODE_EX_USED_BASE INDEX=2 EXTRUDER=T2",
-            "SDCARD_SET_GCODE_EX_USED_BASE INDEX=3 EXTRUDER=T3"
-        ]
-
-        for idx in range(4):
-            tool_val = tools[idx] if idx < len(tools) else (idx + 1)
-            script.append(f"SDCARD_SET_GCODE_EX_USED_CHANGED INDEX={idx} EXTRUDER=T{tool_val-1}")
+        ] + self.ex_table_script(tools)
 
         script.append("SDCARD_SET_NEED_CHECK_EX CHECK=1")
         self.gcode.run_script_from_command("\n".join(script))
