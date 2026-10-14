@@ -1684,7 +1684,7 @@ class zmod_color:
                         if self.get_current_channel() == int(slot['ID']):
                             prompt_text = f"Extruder: {self.get_current_channel()}: {slot['Material']}/{slot['Color']}"
                             if silent == 0:
-                                button_text = f"// action:prompt_button {self._t('remove_from_extruder')}|_T_OUT_ZCOLOR|primary|{slot['HEX']}"
+                                button_text = f"// action:prompt_button {self._t('remove_from_extruder')}|_T_OUT_ZCOLOR|{slot['HEX']}"
                             break
                 else:
                     button_text = f"// action:prompt_button {self._t('remove_from_extruder')}|_T_OUT_ZCOLOR|primary"
@@ -1701,7 +1701,7 @@ class zmod_color:
                 color_name = slot['Color'].replace('_', '/', 1) if slot['Color'].startswith('_') else ''
                 btn_text = f"{slot['ID']}: {slot['Material']}{color_name}"
                 if silent == 0:
-                    gcmd.respond_raw(f"// action:prompt_button {btn_text}|RUN_ZCOLOR SLOT={slot['ID']} HEX={slot['HEX']} TYPE={slot['Material']}|primary|{slot['HEX']}")
+                    gcmd.respond_raw(f"// action:prompt_button {btn_text}|RUN_ZCOLOR SLOT={slot['ID']} HEX={slot['HEX']} TYPE={slot['Material']}|{slot['HEX']}")
                 else:
                     gcmd.respond_raw(f"// {btn_text}/{slot['HEX']}")
 
@@ -2061,19 +2061,18 @@ class zmod_color:
                             prompt_text = f"Extruder: {self.get_current_channel()}: {slot['Material']}/{slot['Color']}"
                             break
 
-                gcmd.respond_raw(f"// action:prompt_text {fname} | {prompt_text}")
+                gcmd.respond_raw(f"// action:prompt_text {fname}|{prompt_text}")
 
                 gcmd.respond_raw("// action:prompt_button_group_start")
                 color = "006400" if leveling == 1 else "808080"
-                gcmd.respond_raw(f"// action:prompt_button {leveling_text}|SET_ZCOLOR SILENT={silent} FILENAME=\"{fname}\" AUTOPA={int(autopa)} LEVELING={int(not leveling)} ALLOWED_TOOL_COUNT={allowed_tool_count} {current_tools_param_text}| |{color}")
+                gcmd.respond_raw(f"// action:prompt_button {leveling_text}|SET_ZCOLOR SILENT={silent} FILENAME=\"{fname}\" AUTOPA={int(autopa)} LEVELING={int(not leveling)} ALLOWED_TOOL_COUNT={allowed_tool_count} {current_tools_param_text}|{color}")
                 color = "006400" if autopa == 1 else "808080"
-                gcmd.respond_raw(f"// action:prompt_button {autopa_text}|SET_ZCOLOR SILENT={silent} FILENAME=\"{fname}\" AUTOPA={int(not autopa)} LEVELING={int(leveling)} ALLOWED_TOOL_COUNT={allowed_tool_count} {current_tools_param_text}| |{color}")
-                auto_prompt = f"// action:prompt_button {self._t('auto_select_colors')}|SET_ZCOLOR SILENT={silent} AUTO_ASSIGN=1 FILENAME=\"{fname}\" AUTOPA={autopa} LEVELING={leveling} ALLOWED_TOOL_COUNT=0 {current_tools_param_text}| "
+                gcmd.respond_raw(f"// action:prompt_button {autopa_text}|SET_ZCOLOR SILENT={silent} FILENAME=\"{fname}\" AUTOPA={int(not autopa)} LEVELING={int(leveling)} ALLOWED_TOOL_COUNT={allowed_tool_count} {current_tools_param_text}|{color}")
                 color = "202020" if auto_assign == 0 else \
                         "EE0000" if (auto_result & AUTO_ASSIGN_ANY_SUCCESS) == 0 or (auto_result & (AUTO_ASSIGN_MATERIAL_FAILURE | AUTO_ASSIGN_COLOR_FAILURE)) != 0 else \
                         "AAAA00" if (auto_result & (AUTO_ASSIGN_COLOR_WEAK | AUTO_ASSIGN_DUPLICATE)) != 0 else \
                         "00DD00"
-                gcmd.respond_raw(f"{auto_prompt}|{color}")
+                gcmd.respond_raw(f"// action:prompt_button {self._t('auto_select_colors')}|SET_ZCOLOR SILENT={silent} AUTO_ASSIGN=1 FILENAME=\"{fname}\" AUTOPA={autopa} LEVELING={leveling} ALLOWED_TOOL_COUNT=0 {current_tools_param_text}|{color}"
                 gcmd.respond_raw("// action:prompt_button_group_end")
 
                 # gcmd.respond_raw(f"// action:prompt_text {self._t('prompt_map_color')}")
@@ -2109,15 +2108,15 @@ class zmod_color:
                     if file_color_hex:
                         raw_color_name  = self.COLOR_MAPPING.get(file_color_hex.lower(), file_color_hex)
                         file_color_name = raw_color_name.replace('_', '/', 1) if raw_color_name.startswith('_') else ''
-                        file_btn_color_param = f"|primary|{file_color_hex}"
+                        file_btn_color_param = f"|{file_color_hex}"
                     else:
-                        file_color_name = '?'
+                        file_color_name = '/?'
                         file_btn_color_param = "|primary"
 
                     if file_material:
                         file_mat_display = file_material
                     else:
-                        file_mat_display = '/?'
+                        file_mat_display = '?'
 
                     file_btn_text = f"{file_mat_display}{file_color_name}"
 
@@ -2140,7 +2139,7 @@ class zmod_color:
                         )
                         gcmd.respond_raw(
                             f"// action:prompt_button {btn_text}|"
-                            f"CHANGE_T_ZCOLOR T={tool_idx} {params}|primary|{slot_info['HEX']}"
+                            f"CHANGE_T_ZCOLOR T={tool_idx} {params}|{slot_info['HEX']}"
                         )
                     if button_index % buttons_per_group == (buttons_per_group - 1) or tool_idx == allowed_tool_count - 1:
                         gcmd.respond_raw("// action:prompt_button_group_end")
@@ -2428,7 +2427,7 @@ class zmod_color:
                 )
                 gcmd.respond_raw(
                     f"// action:prompt_button {btn_text}|"
-                    f"SET_ZCOLOR T{ztool}={slot['ID']} {params}|primary|{slot['HEX']}"
+                    f"SET_ZCOLOR T{ztool}={slot['ID']} {params}|{slot['HEX']}"
                 )
 
             gcmd.respond_raw("// action:prompt_button_group_end")
@@ -2479,7 +2478,7 @@ class zmod_color:
         gcmd.respond_raw("// action:prompt_button_group_start")
         gcmd.respond_raw(
             f"// action:prompt_button {self._t('change_color')}|"
-            f"CHANGE_ZCOLOR SLOT={zslot} TYPE={ztype} HIDE={hide}|primary|{zhex}"
+            f"CHANGE_ZCOLOR SLOT={zslot} TYPE={ztype} HIDE={hide}|{zhex}"
         )
         gcmd.respond_raw(
             f"// action:prompt_button {self._t('change_type')}|"
@@ -2559,7 +2558,7 @@ class zmod_color:
                 color_name = color_name.replace('_', '', 1) if color_name.startswith('_') else '_'
                 gcmd.respond_raw(
                     f"// action:prompt_button {color_name} |"
-                    f"CHANGE_ZCOLOR SLOT={zslot} TYPE={ztype} HEX={hex_code} HIDE={hide}|primary|{hex_code}"
+                    f"CHANGE_ZCOLOR SLOT={zslot} TYPE={ztype} HEX={hex_code} HIDE={hide}|{hex_code}"
                 )
                 counter += 1
                 if counter % 8 == 0 and counter < total_colors:
@@ -2582,7 +2581,7 @@ class zmod_color:
             for material in display_types[:-1]:  # Исключаем '?'
                 gcmd.respond_raw(
                     f"// action:prompt_button {material}|"
-                    f"CHANGE_ZCOLOR SLOT={zslot} TYPE={material} HEX={zhex} HIDE={hide}|primary|{zhex}"
+                    f"CHANGE_ZCOLOR SLOT={zslot} TYPE={material} HEX={zhex} HIDE={hide}|{zhex}"
                 )
                 counter += 1
                 if counter % 4 == 0 and counter < total_materials:
