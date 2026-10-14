@@ -67,10 +67,23 @@ class zmod:
         if not fname.lower().endswith('.3mf'):
             return fname
 
+        fname = fname.lstrip('/')
         src_3mf_path = os.path.join(self.sdcard_dirname, fname)
         p = Path(fname)
         clean_name = p.stem if p.stem.lower().endswith('.gcode') else f"{p.stem}.gcode"
-        target_gcode_path = os.path.join(self.sdcard_dirname, '3mf_print', clean_name)
+
+        # Сохраняем подпапки исходного пути внутри 3mf_print
+        rel_dir = p.parent.as_posix()
+        if rel_dir in ('', '.'):
+            rel_gcode = f"3mf_print/{clean_name}"
+        else:
+            rel_gcode = f"3mf_print/{rel_dir}/{clean_name}"
+
+        target_gcode_path = os.path.join(self.sdcard_dirname, rel_gcode)
+
+        real_root = os.path.realpath(self.sdcard_dirname)
+        if not os.path.realpath(target_gcode_path).startswith(real_root + os.sep):
+            raise gcmd.error("3MF: invalid path")
 
         os.makedirs(os.path.dirname(target_gcode_path), exist_ok=True)
 
@@ -110,9 +123,9 @@ class zmod:
                         os.remove(target_gcode_path)
                     raise ValueError("MD5_MISMATCH")
 
-                self.update_metadata_async(f"3mf_print/{clean_name}")
+                self.update_metadata_async(rel_gcode)
 
-            return f"3mf_print/{clean_name}"
+            return rel_gcode
         except Exception as e:
             if str(e) == "NO_GCODE":
                 err = "!! Ошибка 3MF: Внутри архива не найден файл G-кода" if self.lang == 'ru' else "!! 3MF Error: No G-code file found inside the archive"
