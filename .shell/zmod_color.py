@@ -2741,7 +2741,7 @@ class zmod_color:
             "M114"
         ]
         if float(slot_config.get('filament_drop_length', 0)) == 0.0:
-            script.add(f"_WAIT_TEMP T={t} EXTRUDER_TEMP={slot_config.get('temp'):.3f} BED_TEMP=0 FROM=_T_PREPARE")
+            script.append(f"_WAIT_TEMP T={t} EXTRUDER_TEMP={slot_config.get('temp'):.3f} BED_TEMP=0 FROM=_T_PREPARE")
 
         self.gcode.run_script_from_command("\n".join(script))
 
