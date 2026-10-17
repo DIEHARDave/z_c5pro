@@ -58,7 +58,7 @@
           "id": "extruder3"
         },
         {
-          "color": "purple",
+          "color": "blue",
           "controllable": true,
           "display_name": "Bed",
           "id": "heater_bed"
