@@ -81,8 +81,8 @@ class VirtualSD:
         self.g1_lines = []
         self.need_check_ex = False
         self.no_filament_check_ex = False
-        self.gcode_ex_used = ['T99', 'T99', 'T99', 'T99', 'T99', 'T99']
-        self.gcode_ex_used_changed = ['T99', 'T99', 'T99', 'T99', 'T99', 'T99']
+        self.gcode_ex_used = ['T99' for _ in range(100)]
+        self.gcode_ex_used_changed = ['T99' for _ in range(100)]
         # fp add for preheat (nozzle pre-heating)
         self.enable_speed_return = config.getboolean('enable_speed_return', True)
         self.config_enable_preheat = config.getboolean('enable_preheat', True)
