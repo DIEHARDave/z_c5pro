@@ -3112,6 +3112,13 @@ class zmod_color:
 
 
     def cmd_T_PREPARE_RESTORE(self, gcmd):
+        start_print = gcmd.get_int('START_PRINT', 0)
+        if start_print not in (0, 1):
+            raise gcmd.error(f"START_PRINT must be 0 or 1, got {start_print}")
+        temp = gcmd.get_float('TEMP', 0.0, minval=0.)
+        if start_print == 1 and temp <= 0.:
+            raise gcmd.error("TEMP is required when START_PRINT=1")
+
         try:
             with open(FILE_CONFIG, 'r', encoding='utf-8') as file:
                 tools = json.load(file)
@@ -3136,7 +3143,54 @@ class zmod_color:
             script.append(f"SDCARD_SET_GCODE_EX_USED_CHANGED INDEX={idx} EXTRUDER=T{tool_val-1}")
 
         script.append("SDCARD_SET_NEED_CHECK_EX CHECK=1")
+
+        # Прогрев экструдера, который будет использован первым после текущей позиции в файле
+        if start_print == 1:
+            file_tool = self.find_next_t_code()
+            if file_tool is None:
+                if self.lang == 'ru':
+                    gcmd.respond_info("START_PRINT: команда TN в оставшейся части файла не найдена, прогрев пропущен")
+                else:
+                    gcmd.respond_info("START_PRINT: no TN command found in the rest of the file, heating skipped")
+            else:
+                if 0 <= file_tool < len(tools):
+                    t_fiz = int(tools[file_tool]) - 1
+                else:
+                    t_fiz = file_tool
+                if self.lang == 'ru':
+                    gcmd.respond_info(f"START_PRINT: T{file_tool} -> T{t_fiz}, нагрев до {temp:.1f}")
+                else:
+                    gcmd.respond_info(f"START_PRINT: T{file_tool} -> T{t_fiz}, heating to {temp:.1f}")
+                script.append(f"M104 S{temp:.1f} T{t_fiz}")
+
         self.gcode.run_script_from_command("\n".join(script))
+
+    def find_next_t_code(self, max_lines=3000):
+        """Ищет первую строку вида TN начиная с текущей позиции чтения файла Klipper.
+        Возвращает N (номер экструдера в файле) или None."""
+        vsd = self.virtual_sd
+        path = vsd.file_path()
+        if not path:
+            return None
+        position = max(int(vsd.file_position), 0)
+
+        pattern = re.compile(rb'^T(\d+)(?!\d)')
+        try:
+            with open(path, 'rb') as file:
+                if position > 0:
+                    file.seek(position - 1)
+                    if file.read(1) != b'\n':
+                        file.readline()
+                for i, line in enumerate(file):
+                    if i > max_lines:
+                        break
+                    match = pattern.match(line.strip())
+                    if match:
+                        return int(match.group(1))
+        except Exception:
+            logging.exception("find_next_t_code")
+            return None
+        return None
 
     CALIB_LIFT_MM       = 3.0
     CALIB_FEED_SLOW     = 1200
