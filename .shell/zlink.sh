@@ -32,6 +32,7 @@ if [ "$1" == "get" ]; then
     echo -n "action:prompt_text "
     cat /opt/config/mod_data/ssh.pub.txt | cut -d " " -f 1,2
     echo "action:prompt_footer_button OK|RESPOND TYPE=command MSG=action:prompt_end"
+    sleep 1
     echo "action:prompt_show"
     exit 0
 fi
