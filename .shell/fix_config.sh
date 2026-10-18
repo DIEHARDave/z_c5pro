@@ -380,6 +380,7 @@ fix_config()
     echo "[zmod]
     language: ${ZLANG}" >${MOD_CONF}/mod_data/lang.cfg
 
+    mkdir -p ${MOD_CONF}/mod
     check_link ${MOD_CONF}/mod/shell.cfg /usr/data/zmod/zmod/shell.cfg
     check_link ${MOD_CONF}/mod/moonraker.conf  /usr/data/zmod/zmod/moonraker.conf
     check_link ${MOD_CONF}/mod/extra_plugins.moonraker.conf  /usr/data/zmod/zmod/extra_plugins.moonraker.conf
