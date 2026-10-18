@@ -3161,7 +3161,7 @@ class zmod_color:
                     gcmd.respond_info(f"START_PRINT: T{file_tool} -> T{t_fiz}, нагрев до {temp:.1f}")
                 else:
                     gcmd.respond_info(f"START_PRINT: T{file_tool} -> T{t_fiz}, heating to {temp:.1f}")
-                script.append(f"M104 S{temp:.1f} T{t_fiz}")
+                script.append(f"_WAIT_TEMP T={t_fiz} EXTRUDER_TEMP={temp:.1f} BED_TEMP=0 FROM=_T_PREPARE_RESTORE")
 
         self.gcode.run_script_from_command("\n".join(script))
 
