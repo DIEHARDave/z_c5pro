@@ -176,6 +176,7 @@ class zmod:
                     f"_SET_FAST_KAMP "
                     f"X_START={x_min:.4f} Y_START={y_min:.4f} "
                     f"X_END={x_max:.4f} Y_END={y_max:.4f}"
+                    "FROM=ZEXCLUDE_MF"
                 )
 
                 gcmd.respond_raw(f"ZEXCLUDE_MF: Defining SET_FAST_MAP from 3MF metadata")
@@ -257,11 +258,11 @@ class zmod:
             if found and x_max > x_min and y_max > y_min:
                 self.gcode.run_script_from_command(
                     f"_SET_FAST_KAMP X_START={x_min:.4f} Y_START={y_min:.4f} "
-                    f"X_END={x_max:.4f} Y_END={y_max:.4f}")
+                    f"X_END={x_max:.4f} Y_END={y_max:.4f} FROM=ZEXCLUDE")
                 gcmd.respond_raw(
                     f"ZEXCLUDE: Fast KAMP area {x_min:.1f},{y_min:.1f} - {x_max:.1f},{y_max:.1f}")
             else:
-                self.gcode.run_script_from_command("_RESET_FAST_KAMP")
+                self.gcode.run_script_from_command("_RESET_FAST_KAMP FROM=ZEXCLUDE")
                 gcmd.respond_raw("ZEXCLUDE: No objects found, fast KAMP reset")
         except self.gcode.error as e:
             error_message = str(e)

@@ -84,7 +84,7 @@ $1 ~ /G[123]/ {
     }
 }
 END {
-    printf "_SET_FAST_KAMP X_START=%.4f Y_START=%.4f X_END=%.4f Y_END=%.4f\nRESPOND TYPE=echo MSG=\"SET_FAST_KAMP\"\n",
+    printf "_SET_FAST_KAMP X_START=%.4f Y_START=%.4f X_END=%.4f Y_END=%.4f FROM=zexclude_sh\nRESPOND TYPE=echo MSG=\"SET_FAST_KAMP\"\n",
         minx, miny,         # Левый нижний угол
         maxx, maxy          # Правый верхний угол
 }' > /tmp/printer
