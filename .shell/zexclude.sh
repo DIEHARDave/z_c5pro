@@ -84,12 +84,8 @@ $1 ~ /G[123]/ {
     }
 }
 END {
-    printf "EXCLUDE_OBJECT_DEFINE NAME=border1 CENTER=%.4f,%.4f POLYGON=[[%.4f,%.4f],[%.4f,%.4f],[%.4f,%.4f],[%.4f,%.4f]]\nRESPOND TYPE=echo MSG=\"Exclude 2\"\n",
-        (minx + maxx)/2,    # Центр по X
-        (miny + maxy)/2,    # Центр по Y
+    printf "_SET_FAST_KAMP X_START=%.4f Y_START=%.4f X_END=%.4f Y_END=%.4f\nRESPOND TYPE=echo MSG=\"SET_FAST_KAMP\"\n",
         minx, miny,         # Левый нижний угол
-        minx, maxy,         # Левый верхний угол
-        maxx, maxy,         # Правый верхний угол
-        maxx, miny          # Правый нижний угол
+        maxx, maxy          # Правый верхний угол
 }' > /tmp/printer
 exit 0

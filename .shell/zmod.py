@@ -8,6 +8,10 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 from zipfile import ZipFile
 from pathlib import Path
+import re
+
+POLY_RE = re.compile(r'POLYGON=\[\[(.*?)\]\]')
+NUM_RE = re.compile(r'-?\d+(?:\.\d+)?')
 
 FFCONFIG1='/usr/prog/config/Adventurer5M.json'
 FFCONFIG2='/opt/config/Adventurer5M.json'
@@ -168,16 +172,13 @@ class zmod:
 
                 x_min, y_min, x_max, y_max = float(bbox_all[0]), float(bbox_all[1]), float(bbox_all[2]), float(bbox_all[3])
 
-                x_center = (x_min + x_max) / 2.0
-                y_center = (y_min + y_max) / 2.0
-
                 exclude_cmd = (
-                    f"EXCLUDE_OBJECT_DEFINE NAME=border0 "
-                    f"CENTER={x_center:.4f},{y_center:.4f} "
-                    f"POLYGON=[[{x_min:.4f},{y_min:.4f}],[{x_min:.4f},{y_max:.4f}],[{x_max:.4f},{y_max:.4f}],[{x_max:.4f},{y_min:.4f}]]"
+                    f"_SET_FAST_KAMP "
+                    f"X_START={x_min:.4f} Y_START={y_min:.4f} "
+                    f"X_END={x_max:.4f} Y_END={y_max:.4f}"
                 )
 
-                gcmd.respond_raw(f"ZEXCLUDE_MF: Defining border0 from 3MF metadata")
+                gcmd.respond_raw(f"ZEXCLUDE_MF: Defining SET_FAST_MAP from 3MF metadata")
                 self.gcode.run_script_from_command(exclude_cmd)
 
         except FileNotFoundError:
@@ -211,6 +212,10 @@ class zmod:
                 filename = filename[1:]
             full_path = os.path.join(self.sdcard_dirname, filename)
 
+        x_min = y_min = float('inf')
+        x_max = y_max = float('-inf')
+        found = False
+
         try:
             with open(full_path, 'r') as f:
                 gcmd.respond_raw(f"ZEXCLUDE: {full_path}")
@@ -222,37 +227,55 @@ class zmod:
                     if line_num > max_lines:
                         break
 
-                    line = line.strip()
-
-                    if not line or line.startswith('#'):
+                    if not line.startswith('EXCLUDE_OBJECT_DEFINE'):
                         continue
 
-                    if line.startswith('EXCLUDE_OBJECT_DEFINE'):
-                        try:
-                            self.gcode.run_script_from_command(line)
-                        except self.gcode.error as e:
-                            error_message = str(e)
-                            gcmd.respond_raw(f"ZEXCLUDE: Error on line {line_num}: {error_message}")
-                            logging.error(f"ZEXCLUDE: Error on line {line_num}: {error_message}")
+                    m = POLY_RE.search(line)
+                    if not m:
+                        continue
 
-                            try:
-                                self.gcode.run_script_from_command(self.on_error_gcode.render())
-                                gcmd.respond_raw("ZEXCLUDE: Error handler executed")
-                            except:
-                                logging.exception("zexclude_error")
-                                gcmd.respond_raw("ZEXCLUDE: Error handler failed")
-                            break
-                        except Exception:
-                            logging.exception("zexclude_error")
-                            gcmd.respond_raw("ZEXCLUDE: Unexpected error during script execution")
-                            break
+                    nums = [float(n) for n in NUM_RE.findall(m.group(1))]
+                    xs = nums[0::2]
+                    ys = nums[1::2]
+                    if xs and ys:
+                        x_min = min(x_min, min(xs))
+                        x_max = max(x_max, max(xs))
+                        y_min = min(y_min, min(ys))
+                        y_max = max(y_max, max(ys))
+                        found = True
 
         except FileNotFoundError:
             gcmd.respond_raw(f"ZEXCLUDE: File not found: {full_path}")
             logging.error(f"ZEXCLUDE: File not found: {full_path}")
+            return
         except Exception:
             logging.exception("zexclude_file_error")
             gcmd.respond_raw("ZEXCLUDE: Unexpected error during file processing")
+            return
+
+        try:
+            if found and x_max > x_min and y_max > y_min:
+                self.gcode.run_script_from_command(
+                    f"_SET_FAST_KAMP X_START={x_min:.4f} Y_START={y_min:.4f} "
+                    f"X_END={x_max:.4f} Y_END={y_max:.4f}")
+                gcmd.respond_raw(
+                    f"ZEXCLUDE: Fast KAMP area {x_min:.1f},{y_min:.1f} - {x_max:.1f},{y_max:.1f}")
+            else:
+                self.gcode.run_script_from_command("_RESET_FAST_KAMP")
+                gcmd.respond_raw("ZEXCLUDE: No objects found, fast KAMP reset")
+        except self.gcode.error as e:
+            error_message = str(e)
+            gcmd.respond_raw(f"ZEXCLUDE: Error: {error_message}")
+            logging.error(f"ZEXCLUDE: Error: {error_message}")
+            try:
+                self.gcode.run_script_from_command(self.on_error_gcode.render())
+                gcmd.respond_raw("ZEXCLUDE: Error handler executed")
+            except:
+                logging.exception("zexclude_error")
+                gcmd.respond_raw("ZEXCLUDE: Error handler failed")
+        except Exception:
+            logging.exception("zexclude_error")
+            gcmd.respond_raw("ZEXCLUDE: Unexpected error during script execution")
 
         gcmd.respond_raw("ZEXCLUDE: End")
 
