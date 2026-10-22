@@ -175,7 +175,7 @@ class zmod:
                 exclude_cmd = (
                     f"_SET_FAST_KAMP "
                     f"X_START={x_min:.4f} Y_START={y_min:.4f} "
-                    f"X_END={x_max:.4f} Y_END={y_max:.4f}"
+                    f"X_END={x_max:.4f} Y_END={y_max:.4f} "
                     "FROM=ZEXCLUDE_MF"
                 )
 
@@ -213,9 +213,25 @@ class zmod:
                 filename = filename[1:]
             full_path = os.path.join(self.sdcard_dirname, filename)
 
+        fast = gcmd.get_int("FAST", 0)
+        scan_first = gcmd.get_int("SCAN_FIRST", 0)
+
+        load = (fast == 0)
+        if load:
+            self.gcode.run_script_from_command("EXCLUDE_OBJECT_DEFINE RESET=1")
+
+        # Прямоугольник по ранее отсканированным исключениям (EXCLUDE_OBJECT_DEFINE)
         x_min = y_min = float('inf')
         x_max = y_max = float('-inf')
         found = False
+
+        # Прямоугольник по первому слою
+        f_x_min = f_y_min = float('inf')
+        f_x_max = f_y_max = float('-inf')
+        f_x_seen = f_y_seen = False
+
+        # 0 - до первого ;LAYER_CHANGE, 1 - внутри первого слоя, 2 - готово или не нужно
+        layer_state = 0 if scan_first else 2
 
         try:
             with open(full_path, 'r') as f:
@@ -225,11 +241,60 @@ class zmod:
                 line_num = 0
                 for line in f:
                     line_num += 1
-                    if line_num > max_lines:
+
+                    # После лимита читаем дальше только пока не закончился первый слой
+                    if line_num > max_lines and layer_state >= 2:
                         break
 
-                    if not line.startswith('EXCLUDE_OBJECT_DEFINE'):
+                    # --- Сканирование первого слоя ---
+                    if layer_state < 2:
+                        if line.startswith(';LAYER_CHANGE'):
+                            layer_state += 1
+                        elif layer_state == 1 and line.startswith('G'):
+                            parts = line.split()
+                            if parts[0] in ('G1', 'G2', 'G3'):
+                                for t in parts[1:]:
+                                    c = t[0]
+                                    if c == ';':
+                                        break
+                                    if c != 'X' and c != 'Y':
+                                        continue
+                                    try:
+                                        v = float(t[1:])
+                                    except ValueError:
+                                        continue
+                                    if c == 'X':
+                                        f_x_min = min(f_x_min, v)
+                                        f_x_max = max(f_x_max, v)
+                                        f_x_seen = True
+                                    else:
+                                        f_y_min = min(f_y_min, v)
+                                        f_y_max = max(f_y_max, v)
+                                        f_y_seen = True
+
+                    # --- Исключения из заголовка (только первые max_lines строк) ---
+                    if line_num > max_lines or not line.startswith('EXCLUDE_OBJECT_DEFINE'):
                         continue
+
+                    if load:
+                        try:
+                            self.gcode.run_script_from_command(line)
+                        except self.gcode.error as e:
+                            error_message = str(e)
+                            gcmd.respond_raw(f"ZEXCLUDE: Error on line {line_num}: {error_message}")
+                            logging.error(f"ZEXCLUDE: Error on line {line_num}: {error_message}")
+
+                            try:
+                                self.gcode.run_script_from_command(self.on_error_gcode.render())
+                                gcmd.respond_raw("ZEXCLUDE: Error handler executed")
+                            except:
+                                logging.exception("zexclude_error")
+                                gcmd.respond_raw("ZEXCLUDE: Error handler failed")
+                            load = False  # дальше не загружаем, но границы считаем
+                        except Exception:
+                            logging.exception("zexclude_error")
+                            gcmd.respond_raw("ZEXCLUDE: Unexpected error during script execution")
+                            load = False
 
                     m = POLY_RE.search(line)
                     if not m:
@@ -253,6 +318,19 @@ class zmod:
             logging.exception("zexclude_file_error")
             gcmd.respond_raw("ZEXCLUDE: Unexpected error during file processing")
             return
+
+        # --- Объединяем два прямоугольника ---
+        if scan_first:
+            if f_x_seen and f_y_seen and f_x_max > f_x_min and f_y_max > f_y_min:
+                gcmd.respond_raw(
+                    f"ZEXCLUDE: First layer {f_x_min:.1f},{f_y_min:.1f} - {f_x_max:.1f},{f_y_max:.1f}")
+                x_min = min(x_min, f_x_min)
+                y_min = min(y_min, f_y_min)
+                x_max = max(x_max, f_x_max)
+                y_max = max(y_max, f_y_max)
+                found = True
+            else:
+                gcmd.respond_raw("ZEXCLUDE: First layer area not found")
 
         try:
             if found and x_max > x_min and y_max > y_min:
