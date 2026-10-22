@@ -4,7 +4,7 @@ fix_firmwareExe()
 {
     if [ "$FILE_MD5" = "$1" ]; then
         printf '\x00\x00\x00\x00' | dd of=/usr/prog/PROGRAM/software/firmwareExe bs=1 seek=$2 conv=notrunc
-        [ "$3" -ne 0 ]; printf '\x00\x10' | dd of=/usr/prog/PROGRAM/software/firmwareExe bs=1 seek=$3 conv=notrunc
+        [ "$3" -ne 0 ] && printf '\x00\x10' | dd of=/usr/prog/PROGRAM/software/firmwareExe bs=1 seek=$3 conv=notrunc
     fi
 }
 
