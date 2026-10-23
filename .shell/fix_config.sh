@@ -589,6 +589,9 @@ unset LD_PRELOAD
         NEED_REBOOT=1
     fi
 
+    # Удаление mainsail.cfg для любитедлей ютуба
+    grep -q 'mainsail.cfg' ${PRINTER_CFG} && sed -i '/mainsail.cfg/d' ${PRINTER_CFG} && NEED_REBOOT=1
+
     # Удаление check_md5.cfg
     grep -q '^\[include check_md5.cfg\]' ${PRINTER_CFG} && sed -i '/^\[include check_md5.cfg\]/d' ${PRINTER_CFG} && NEED_REBOOT=1
 
