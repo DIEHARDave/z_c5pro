@@ -148,13 +148,11 @@ def conf_lines():
     except Exception:
         return []
 
-
 def conf_save(lines):
     while lines and not lines[-1].strip():
         lines.pop()
     with open(CONF_OUT, "w") as f:
         f.write("\n".join(lines) + "\n")
-
 
 def find_block(lines, name, commented):
     hdr = f"[update_manager {name}]"
@@ -173,7 +171,6 @@ def find_block(lines, name, commented):
                 j -= 1
             return i, j
     return None
-
 
 def sec_state(name):
     lines = conf_lines()
@@ -310,6 +307,7 @@ def toggle_updates(printer, name):
     menu(printer)
 
 def apply(printer):
+    gcode('RESPOND TYPE=command MSG="action:prompt_end"')
     api("POST", "/server/restart")
 
 if __name__ == "__main__":
