@@ -2717,10 +2717,7 @@ class zmod_color:
             ]
         script += ["_ENABLE_SENSOR",
             "G1 X250 F6000",                              # Идем к резинке
-            f"G1 Y{slot_config.get('wiper_y'):.3f} F24000",
-            f"G1 X{slot_config.get('wiper_x'):.3f} F6000",
-            f"G1 Z{wiper_z:.3f} F600",
-            "M400",
+            f"_WIPER X={slot_config.get('wiper_x'):.3f} Y={slot_config.get('wiper_y'):.3f} Z={wiper_z:.3f}"
             "M114"
         ]
         if float(slot_config.get('filament_drop_length', 0)) == 0.0:
@@ -3432,11 +3429,7 @@ class zmod_color:
                     "G1 E-5 F240",
                     "M400",
                     "G1 X250 F6000",
-                    f"G1 Y{wiper_y:.3f} F24000",
-                    f"G1 X{wiper_x:.3f} F6000",
-                    "M400",
-                    f"G1 Z{wiper_z:.3f} F600",
-                    "M400",
+                    f"_WIPER X={wiper_x:.3f} Y={wiper_y:.3f} Z={wiper_z:.3f}",
                     f"_WAIT_TEMP T={t_idx} EXTRUDER_TEMP={wait_temp:.3f} DELTA_T=0.5 BED_TEMP={bed_temp:.1f} DELTA_BED=0.1 FROM=_T_CALIBRATE_EXTRUDER",
                     "M106 P1 S0",
                     f"G1 Z{safe_z:.2f} F1200",
