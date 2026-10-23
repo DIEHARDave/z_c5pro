@@ -1,0 +1,64 @@
+{
+  "recommend": {
+    "url": "https://github.com/ghzserg/recommend.git", "branch": "main",
+    "ensure_update": true,
+    "printers": ["FF5M", "AD5X", "C5PRO"]
+  },
+  "timelapse": {
+    "url": "https://github.com/ghzserg/timelapse.git", "branch": "main",
+    "printers": ["FF5M", "AD5X", "C5PRO"]
+  },
+  "notify": {
+    "url": "https://github.com/ghzserg/notify.git", "branch": "main",
+    "printers": ["FF5M", "AD5X", "C5PRO"]
+  },
+ "g28_tenz": {
+    "url": "https://github.com/ghzserg/g28_tenz.git", "branch": "main",
+    "printers": ["FF5M", "AD5X"]
+  },
+ "helixscreen": {
+    "type": "web",
+    "repo": "prestonbrown/helixscreen",
+    "path": "/srv/helixscreen",
+    "persistent_files": "config/helixconfig.json",
+    "var": "helix",
+    "start_cmd": "",
+    "printers": [
+      "FF5M",
+      "AD5X",
+      "C5PRO"
+    ]
+  },
+  "nopoop": {
+    "url": "https://github.com/ghzserg/nopoop.git", "branch": "master",
+    "printers": ["AD5X"]
+  },
+    "quickswap": {
+    "url": "https://github.com/ninjamida/quickswap-5x.git", "branch": "master",
+    "printers": ["AD5X"]
+  },
+  "lesswaste": {
+    "url": "https://github.com/Hrybmo/lesswaste.git", "branch": "master",
+    "printers": ["AD5X"]
+  },
+  "bambufy": {
+    "url": "https://github.com/function3d/bambufy.git", "branch": "master",
+    "printers": ["AD5X"]
+  },
+  "ifs_jacker": {
+    "url": "https://github.com/ninjamida/ifs_jacker_plugin.git", "branch": "master",
+    "printers": ["AD5X"]
+  },
+  "zmod_afclite": {
+    "url": "https://github.com/DIEHARDave/zmod_afclite.git", "branch": "main",
+    "printers": ["AD5X", "C5PRO"]
+  },
+  "dryer": {
+    "url": "https://github.com/pantata/dryer.git", "branch": "master",
+    "printers": ["AD5X"]
+  },
+    "flook32": {
+    "url": "https://github.com/ghzserg/flook32_plugin.git", "branch": "main",
+    "printers": ["FF5M", "AD5X", "C5PRO"]
+  }
+}

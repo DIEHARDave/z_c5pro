@@ -879,7 +879,7 @@ INSERT INTO "main"."namespace_store" ("namespace", "key", "value") VALUES ('flui
             "categoryId": "944c031b-feef-4b75-badf-21c30508fb24",
             "color": "#008800",
             "disabledWhilePrinting": false,
-            "name": "save_zmod_data",
+            "name": "plugins",
             "order": 13,
             "visible": true
         },
