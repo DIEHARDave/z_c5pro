@@ -270,7 +270,7 @@ def toggle(printer, name):
             elif p.get("var"):
                 setvar, new_state = (p["var"], 0), False
             text = f"{name}: Disabled"
-        else
+        else:
             unmark_remove(path)          # плагин включается - каталог не удалять
             if web:
                 if not os.path.isdir(path):
