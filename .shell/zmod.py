@@ -47,7 +47,7 @@ class zmod:
     def cmd_SDCARD_PRINT_FILE_MF(self, gcmd):
         filename = gcmd.get("FILENAME", None)
         if not filename:
-            gcmd.respond_raw("SDCARD_PRINT_FILE_3MF: FILENAME is required (no file loaded)")
+            gcmd.respond_raw("SDCARD_PRINT_FILE_MF: FILENAME is required (no file loaded)")
             return
         fname = self._extract_3mf_gcode(filename, gcmd)
         self.gcode.run_script_from_command(f"SDCARD_PRINT_FILE FILENAME=\"{fname}\"")
