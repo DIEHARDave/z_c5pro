@@ -19,7 +19,7 @@ PLATE_GCODE_RE = re.compile(r'Metadata/plate_(\d+)\.gcode')
 # поэтому периодически отдаём управление реактору
 UNPACK_CHUNK = 16384          # размер блока чтения/записи
 UNPACK_PAUSE_EVERY = 32       # пауза раз в N блоков (32 * 16 КБ = 0.5 МБ)
-LINE_PAUSE_EVERY = 200        # пауза раз в 200 строк
+LINE_PAUSE_EVERY = 10000      # пауза раз в 10000 строк
 UNPACK_PAUSE_TIME = 0.1       # длительность паузы, сек
 METADATA_PAUSE_TIME = 2.0     # пауза после запуска metascan, чтобы Moonraker начал работу
 
