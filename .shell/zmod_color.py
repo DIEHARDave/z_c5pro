@@ -1686,7 +1686,7 @@ class zmod_color:
             lines = 0
             for line_raw in f:
                 lines += 1
-                if lines % 10000 == 0:
+                if lines % 20000 == 0:
                     self.zmod._yield_reactor(0.1)
 
                 line = line_raw.strip().casefold()
