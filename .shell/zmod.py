@@ -178,8 +178,6 @@ class zmod:
                     f"X_END={x_max:.4f} Y_END={y_max:.4f} "
                     "FROM=ZEXCLUDE_MF"
                 )
-
-                gcmd.respond_raw(f"ZEXCLUDE_MF: Defining SET_FAST_MAP from 3MF metadata")
                 self.gcode.run_script_from_command(exclude_cmd)
 
         except FileNotFoundError:
@@ -199,6 +197,33 @@ class zmod:
         start = gcmd.get_int("START", 0)
         if self.c5pro:
             return
+
+        config_path = FFCONFIG1 if os.path.isfile(FFCONFIG1) else FFCONFIG2 if os.path.isfile(FFCONFIG2) else None
+        if not config_path:
+            raise gcmd.error(f"LOAD_ZOFFSET_NATIVE: File not found {FFCONFIG1}, {FFCONFIG2}")
+
+        with open(config_path, 'r', encoding='utf-8', errors='ignore') as f:
+            data = json.load(f)
+
+        try:
+            z_probe_offset = data['leftExtruderOffset']['zProbeOffset']
+        except KeyError as e:
+            z_probe_offset = 0.0
+
+        zoffset = round(float(z_probe_offset), 4)
+        if not self.ad5x and not self.c5pro:
+            zoffset += 0.025
+            if self.screen or start == 0:
+                if self.lang != 'ru':
+                    gcmd.respond_raw("Actual Z-Offset for AD5M/AD5MPro is 0.025mm greater than value displayed on native screen")
+                    gcmd.respond_raw(f"On native screen: {zoffset-0.025}")
+                    gcmd.respond_raw(f"Actual: {zoffset}")
+                else:
+                    gcmd.respond_raw("Фактический Z-Offset принтера AD5M/AD5MPro на 0.025 мм больше значения, отображаемого на родном экране")
+                    gcmd.respond_raw(f"На родном экране: {zoffset-0.025}")
+                    gcmd.respond_raw(f"Фактический: {zoffset}")
+
+        self.gcode.run_script_from_command(f"SET_GCODE_OFFSET Z={zoffset:.4f} START={start} FROM=LOAD_ZOFFSET_NATIVE")
 
     def cmd_ZEXCLUDE(self, gcmd):
         filename = gcmd.get("FILENAME", None)
@@ -234,7 +259,7 @@ class zmod:
         layer_state = 0 if scan_first else 2
 
         try:
-            with open(full_path, 'r') as f:
+            with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
                 gcmd.respond_raw(f"ZEXCLUDE: {full_path}")
 
                 max_lines = 3000
