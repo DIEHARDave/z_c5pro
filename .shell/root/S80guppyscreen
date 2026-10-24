@@ -74,7 +74,13 @@ stop() {
 
 HELIX=0
 if grep -q "helix = 1" /opt/config/mod_data/variables.cfg && [ -f /etc/init.d/S80helixscreen ]; then
-    HELIX=1
+    DAEMON_DIR="/srv/helixscreen"
+    DAEMON="${DAEMON_DIR}/bin/helix-screen"
+    SPLASH="${DAEMON_DIR}/bin/helix-splash"
+    WATCHDOG="${DAEMON_DIR}/bin/helix-watchdog"
+    LAUNCHER="${DAEMON_DIR}/bin/helix-launcher.sh"
+
+    [ -f $DAEMON ] && [ -f $SPLASH ] && [ -f $WATCHDOG ] && [ -f $LAUNCHER ] && HELIX=1
 fi
 
 case "$1" in

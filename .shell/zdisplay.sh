@@ -51,7 +51,7 @@ display_off()
     if [ $1 = "test" ] && grep -q display_off.cfg /opt/config/printer.cfg; then
         killall firmwareExe helix-watchdog helix-screen helix-splash
         sleep 1
-        if grep -q "guppy = 1" /opt/config/mod_data/variables.cfg || grep -q "helix = 1" /opt/config/mod_data/variables.cfg ; then
+        if grep -q "guppy = 1" /opt/config/mod_data/variables.cfg || grep -q "helix = 1" /opt/config/mod_data/variables.cfg; then
             /usr/data/zmod/zmod/.shell/zguppy.sh up
         else
             xzcat /usr/data/zmod/zmod/.shell/screen_off.raw.xz > /dev/fb0
