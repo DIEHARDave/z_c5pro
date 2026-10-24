@@ -18,9 +18,10 @@ PLATE_GCODE_RE = re.compile(r'Metadata/plate_(\d+)\.gcode')
 # Распаковка 3mf блокирует реактор Klipper (иначе: MCU shutdown: Timer too close),
 # поэтому периодически отдаём управление реактору
 UNPACK_CHUNK = 16384          # размер блока чтения/записи
-UNPACK_PAUSE_EVERY = 64       # пауза раз в N блоков (64 * 16 КБ = 1 МБ)
+UNPACK_PAUSE_EVERY = 32       # пауза раз в N блоков (32 * 16 КБ = 0.5 МБ)
+LINE_PAUSE_EVERY = 200        # пауза раз в 200 строк
 UNPACK_PAUSE_TIME = 0.1       # длительность паузы, сек
-METADATA_PAUSE_TIME = 1.0     # пауза после запуска metascan, чтобы Moonraker начал работу
+METADATA_PAUSE_TIME = 2.0     # пауза после запуска metascan, чтобы Moonraker начал работу
 
 FFCONFIG1='/usr/prog/config/Adventurer5M.json'
 FFCONFIG2='/opt/config/Adventurer5M.json'
@@ -226,6 +227,7 @@ class zmod:
                     if raw_md5_content:
                         expected_md5 = raw_md5_content.split()[0].lower()
 
+                gcmd.respond_raw(f"// 3MF: Unzip {fname}[{plate_num}]...")
                 with zip_ref.open(gcode_in_zip) as source, open(target_gcode_path, 'wb') as target:
                     blocks = 0
                     while True:
@@ -237,6 +239,7 @@ class zmod:
                         if blocks % UNPACK_PAUSE_EVERY == 0:
                             self._yield_reactor(UNPACK_PAUSE_TIME)
 
+                gcmd.respond_raw(f"// 3MF: Check MD5 {fname}[{plate_num}]...")
                 md5_hash = hashlib.md5()
                 with open(target_gcode_path, 'rb') as f_check:
                     blocks = 0
@@ -256,6 +259,7 @@ class zmod:
                     if os.path.exists(target_gcode_path):
                         os.remove(target_gcode_path)
                     raise ValueError("MD5_MISMATCH")
+                gcmd.respond_raw("// 3MF: Ok")
 
                 self.update_metadata_async(rel_gcode)
                 # Даём Moonraker начать сканирование, прежде чем Klipper продолжит подготовку печати
@@ -402,6 +406,9 @@ class zmod:
                 line_num = 0
                 for line in f:
                     line_num += 1
+
+                    if line_num % LINE_PAUSE_EVERY == 0:
+                        self._yield_reactor(UNPACK_PAUSE_TIME)
 
                     # После лимита читаем дальше только пока не закончился первый слой
                     if line_num > max_lines and layer_state >= 2:
