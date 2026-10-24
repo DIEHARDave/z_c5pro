@@ -85,7 +85,7 @@ display_off()
         echo _REBOOT >/tmp/printer
         sync
         sleep 5
-        reboot
+        /usr/data/zmod/zmod/.shell/zremote.sh reboot
     fi
 
     sync
