@@ -7,11 +7,13 @@ import threading
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 from zipfile import ZipFile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 import re
 
 POLY_RE = re.compile(r'POLYGON=\[\[(.*?)\]\]')
 NUM_RE = re.compile(r'-?\d+(?:\.\d+)?')
+PLATE_GCODE_RE = re.compile(r'Metadata/plate_(\d+)\.gcode')
 
 FFCONFIG1='/usr/prog/config/Adventurer5M.json'
 FFCONFIG2='/opt/config/Adventurer5M.json'
@@ -68,7 +70,108 @@ class zmod:
 
         threading.Thread(target=_worker, daemon=True).start()
 
-    # PLATE
+    # 3MF
+    def _3mf_path(self, fname):
+        fname = fname.lstrip('/')
+        real_root = os.path.realpath(self.sdcard_dirname)
+        path = os.path.join(self.sdcard_dirname, fname)
+        if not os.path.realpath(path).startswith(real_root + os.sep):
+            raise ValueError("3MF: invalid path")
+        return path
+
+    @staticmethod
+    def _sliced_plates(names):
+        plates = set()
+        for name in names:
+            m = PLATE_GCODE_RE.fullmatch(name)
+            if m:
+                plates.add(int(m.group(1)))
+        return sorted(plates)
+
+    def get_plates(self, fname):
+        if not fname.lower().endswith('.3mf'):
+            return []
+        try:
+            with ZipFile(self._3mf_path(fname), 'r') as zip_ref:
+                return self._sliced_plates(zip_ref.namelist())
+        except Exception:
+            return []
+
+    def get_plate(self, gcmd, fname):
+        requested = gcmd.get_int("PLATE", None)
+        if requested is not None and requested < 1:
+            raise gcmd.error("PLATE must be >= 1")
+
+        plates = self.get_plates(fname)
+        if not plates:
+            return requested if requested is not None else 1
+        if requested is None:
+            return plates[0]
+        if requested in plates:
+            return requested
+
+        chosen = next((p for p in plates if p > requested), plates[0])
+        if self.lang == 'ru':
+            gcmd.respond_raw(f"// 3MF: плата {requested} не нарезана, используется {chosen}")
+        else:
+            gcmd.respond_raw(f"// 3MF: plate {requested} is not sliced, using {chosen}")
+        return chosen
+
+    @staticmethod
+    def _collect_3mf_filaments(elements):
+        """<filament id= type= color=> -> [(tool_idx, color, type)], tool_idx 0-based."""
+        colors = {}
+        for fil in elements:
+            fil_id_str = fil.attrib.get("id")
+            if not fil_id_str:
+                continue
+            try:
+                tool_idx = int(fil_id_str) - 1
+            except ValueError:
+                continue
+            colors[tool_idx] = (
+                tool_idx,
+                fil.attrib.get("color", "").strip(),
+                fil.attrib.get("type", "").strip()
+            )
+        return [colors[k] for k in sorted(colors)] or None
+
+    def get_colors(self, fname, plate, gcmd=None):
+        """Цвета филаментов платы plate из Metadata/slice_info.config:
+        [(tool_idx, color, type)] или None. При неудаче и переданном gcmd выводит причину."""
+        debug = ''
+        colors = None
+        try:
+            with ZipFile(self._3mf_path(fname), 'r') as zip_ref:
+                if 'Metadata/slice_info.config' not in zip_ref.namelist():
+                    debug = "Metadata/slice_info.config not found"
+                else:
+                    root = ET.fromstring(zip_ref.read('Metadata/slice_info.config'))
+                    indexes = []
+                    for node in root.iter('plate'):
+                        idx = None
+                        for md in node.findall('metadata'):
+                            if md.attrib.get('key') == 'index':
+                                try:
+                                    idx = int(md.attrib.get('value'))
+                                except (TypeError, ValueError):
+                                    pass
+                                break
+                        if idx is None:
+                            continue
+                        indexes.append(idx)
+                        if idx == plate:
+                            colors = self._collect_3mf_filaments(node.iter('filament'))
+                            break
+                    if not colors:
+                        debug = f"no filaments for plate {plate} in slice_info.config (plates: {indexes})"
+        except Exception as e:
+            debug = f"{type(e).__name__}: {e}"
+
+        if not colors and gcmd is not None:
+            gcmd.respond_raw(f"// 3MF: {debug}")
+        return colors
+
     def _extract_3mf_gcode(self, fname, gcmd):
         if not fname.lower().endswith('.3mf'):
             return fname
@@ -77,11 +180,9 @@ class zmod:
         src_3mf_path = os.path.join(self.sdcard_dirname, fname)
         p = Path(fname)
 
-        plate_num = gcmd.get_int("PLATE", 1)
-        if plate_num < 1:
-            raise gcmd.error("PLATE must be >= 1")
+        plate_num = self.get_plate(gcmd, fname)
         stem = p.stem[:-len('.gcode')] if p.stem.lower().endswith('.gcode') else p.stem
-        clean_name = f"{stem}.gcode" if plate_num == 1 else f"{stem}_plate{plate_num}.gcode"
+        clean_name = f"{stem}.gcode" if plate_num == 1 else f"{stem}_{plate_num}.gcode"
 
         # Сохраняем подпапки исходного пути внутри 3mf_print
         rel_dir = p.parent.as_posix()
@@ -164,13 +265,11 @@ class zmod:
             gcmd.respond_raw("ZEXCLUDE_MF: File must be a .3mf archive")
             return
 
+        plate_num = self.get_plate(gcmd, filename)
+
         try:
             with ZipFile(full_path, 'r') as zip_ref:
                 file_list = zip_ref.namelist()
-
-                plate_num = gcmd.get_int("PLATE", 1)
-                if plate_num < 1:
-                    raise gcmd.error("PLATE must be >= 1")
 
                 config_file = f'Metadata/plate_{plate_num}.json'
                 if config_file not in file_list:
