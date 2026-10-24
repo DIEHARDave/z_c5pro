@@ -44,6 +44,7 @@ class zmod:
         self.virtual_sdcard = self.printer.lookup_object('virtual_sdcard')
         self.sdcard_dirname = self.virtual_sdcard.sdcard_dirname
 
+    # PLATE
     def cmd_SDCARD_PRINT_FILE_MF(self, gcmd):
         filename = gcmd.get("FILENAME", None)
         if not filename:
@@ -67,6 +68,7 @@ class zmod:
 
         threading.Thread(target=_worker, daemon=True).start()
 
+    # PLATE
     def _extract_3mf_gcode(self, fname, gcmd):
         if not fname.lower().endswith('.3mf'):
             return fname
@@ -74,7 +76,12 @@ class zmod:
         fname = fname.lstrip('/')
         src_3mf_path = os.path.join(self.sdcard_dirname, fname)
         p = Path(fname)
-        clean_name = p.stem if p.stem.lower().endswith('.gcode') else f"{p.stem}.gcode"
+
+        plate_num = gcmd.get_int("PLATE", 1)
+        if plate_num < 1:
+            raise gcmd.error("PLATE must be >= 1")
+        stem = p.stem[:-len('.gcode')] if p.stem.lower().endswith('.gcode') else p.stem
+        clean_name = f"{stem}.gcode" if plate_num == 1 else f"{stem}_plate{plate_num}.gcode"
 
         # Сохраняем подпапки исходного пути внутри 3mf_print
         rel_dir = p.parent.as_posix()
@@ -95,28 +102,30 @@ class zmod:
             with ZipFile(src_3mf_path, 'r') as zip_ref:
                 file_list = zip_ref.namelist()
 
-                internal_gcode_names = [f for f in file_list if f.lower().endswith('.gcode')]
-                if not internal_gcode_names:
-                    raise ValueError("NO_GCODE")
-
-                internal_gcode_names.sort()
-                gcode_in_zip = internal_gcode_names[0]
+                gcode_in_zip = f"Metadata/plate_{plate_num}.gcode"
+                if gcode_in_zip not in file_list:
+                    raise ValueError(f"INVALID_PLATE_NUM:{plate_num}")
 
                 expected_md5 = None
                 md5_file_path = gcode_in_zip + ".md5"
                 if md5_file_path in file_list:
-                    raw_md5_content = zip_ref.read(md5_file_path).decode('utf-8', errors='ignore').strip()
+                    raw_md5_content = zip_ref.read(md5_file_path).decode('utf-8-sig', errors='ignore').strip()
                     if raw_md5_content:
                         expected_md5 = raw_md5_content.split()[0].lower()
 
-                # Потоковое чтение и запись чанками по 16КБ для экономии ОЗУ
-                md5_hash = hashlib.md5()
                 with zip_ref.open(gcode_in_zip) as source, open(target_gcode_path, 'wb') as target:
                     while True:
                         chunk = source.read(16384)
                         if not chunk:
                             break
                         target.write(chunk)
+
+                md5_hash = hashlib.md5()
+                with open(target_gcode_path, 'rb') as f_check:
+                    while True:
+                        chunk = f_check.read(16384)
+                        if not chunk:
+                            break
                         md5_hash.update(chunk)
 
                 current_md5 = md5_hash.hexdigest().lower()
@@ -131,14 +140,16 @@ class zmod:
 
             return rel_gcode
         except Exception as e:
-            if str(e) == "NO_GCODE":
-                err = "!! Ошибка 3MF: Внутри архива не найден файл G-кода" if self.lang == 'ru' else "!! 3MF Error: No G-code file found inside the archive"
+            if str(e).startswith("INVALID_PLATE_NUM"):
+                p_num = str(e).split(":")[-1]
+                err = f"!! Ошибка 3MF: Плата N{p_num} не найдена в файле" if self.lang == 'ru' else f"!! 3MF Error: Plate N{p_num} not found in file"
             elif str(e) == "MD5_MISMATCH":
                 err = "!! Ошибка MD5: Контрольная сумма gcode не совпадает с файлом .md5 в 3MF" if self.lang == 'ru' else "!! MD5 Error: Extracted G-code hash does not match the internal .md5 file"
             else:
                 err = f"!! Ошибка распаковки архива 3MF: {str(e)}" if self.lang == 'ru' else f"!! 3MF unpack error: {str(e)}"
             raise gcmd.error(err)
 
+    # PLATE
     def cmd_ZEXCLUDE_MF(self, gcmd):
         filename = gcmd.get("FILENAME", None)
         if not filename:
@@ -157,7 +168,11 @@ class zmod:
             with ZipFile(full_path, 'r') as zip_ref:
                 file_list = zip_ref.namelist()
 
-                config_file = 'Metadata/plate_1.json'
+                plate_num = gcmd.get_int("PLATE", 1)
+                if plate_num < 1:
+                    raise gcmd.error("PLATE must be >= 1")
+
+                config_file = f'Metadata/plate_{plate_num}.json'
                 if config_file not in file_list:
                     gcmd.respond_raw(f"ZEXCLUDE_MF: Configuration file '{config_file}' not found inside 3MF")
                     return
@@ -167,7 +182,7 @@ class zmod:
 
                 bbox_all = data.get("bbox_all", None)
                 if not bbox_all or len(bbox_all) != 4:
-                    gcmd.respond_raw("ZEXCLUDE_MF: 'bbox_all' valid data not found in slice_info.config")
+                    gcmd.respond_raw(f"ZEXCLUDE_MF: 'bbox_all' valid data not found in Metadata/plate_{plate_num}.json")
                     return
 
                 x_min, y_min, x_max, y_max = float(bbox_all[0]), float(bbox_all[1]), float(bbox_all[2]), float(bbox_all[3])
@@ -184,7 +199,7 @@ class zmod:
             gcmd.respond_raw(f"ZEXCLUDE_MF: File not found: {full_path}")
             logging.error(f"ZEXCLUDE_MF: File not found: {full_path}")
         except json.JSONDecodeError:
-            gcmd.respond_raw("ZEXCLUDE_MF: Failed to parse JSON in slice_info.config")
+            gcmd.respond_raw("ZEXCLUDE_MF: JSON decode error")
             logging.error("ZEXCLUDE_MF: JSON decode error")
         except Exception as e:
             logging.exception("zexclude_mf_error")
@@ -207,7 +222,7 @@ class zmod:
 
         try:
             z_probe_offset = data['leftExtruderOffset']['zProbeOffset']
-        except KeyError as e:
+        except KeyError:
             z_probe_offset = 0.0
 
         zoffset = round(float(z_probe_offset), 4)
@@ -312,7 +327,7 @@ class zmod:
                             try:
                                 self.gcode.run_script_from_command(self.on_error_gcode.render())
                                 gcmd.respond_raw("ZEXCLUDE: Error handler executed")
-                            except:
+                            except Exception:
                                 logging.exception("zexclude_error")
                                 gcmd.respond_raw("ZEXCLUDE: Error handler failed")
                             load = False  # дальше не загружаем, но границы считаем
@@ -374,7 +389,7 @@ class zmod:
             try:
                 self.gcode.run_script_from_command(self.on_error_gcode.render())
                 gcmd.respond_raw("ZEXCLUDE: Error handler executed")
-            except:
+            except Exception:
                 logging.exception("zexclude_error")
                 gcmd.respond_raw("ZEXCLUDE: Error handler failed")
         except Exception:
