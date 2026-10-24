@@ -3,12 +3,6 @@ import re
 import json
 import requests
 import logging
-import hashlib
-import threading
-import urllib.parse
-import urllib.request
-from zipfile import ZipFile
-from pathlib import Path
 import subprocess
 
 FFCONFIG='/usr/data/firmwareRes/config/'
@@ -24,7 +18,7 @@ DEFAULT_FILAMENT_SETTINGS = {
     "temp_wait": 120,                   # Температура простоя
     "filament_tube_length": 295,        # Длина загрузки
     "filament_drop_length": 50,         # Длина продувки перед печатью
-    "filament_full_length": 600.0,      # Длина трукбки, столько будет печать после окончания филамента
+    "filament_full_length": 600.0,      # Длина трубки, столько будет печать после окончания филамента
     "trash_x": 275.0,                   # Координата корзины
     "trash_y": 254.0,
     "trash_z": 10.0,
@@ -43,7 +37,6 @@ TRANSLATIONS = {
         'auto_select_colors': "Автовыбор цветов",
         'cancel': "Отмена",
         'change_color': "Сменить цвет",
-        'change_spool': "Меняю на катушку {}: {} / {}",
         'change_type': "Сменить тип",
         'config_error': "!! Ошибка смены цвета / типа\n{}",
         'config_success': "Настройки сохранены",
@@ -56,10 +49,7 @@ TRANSLATIONS = {
         'error_slot': "Неверный SLOT. Допустимые: 1-4",
         'error_tool': "Неверный T{}: {}. Допустимо: 1-4",
         'error_type': "Неверный тип материала: {}. Допустимо: {}",
-        'file_tool': "Файл",
-        'hide_color_selection': "Скрыть выбор цвета, печатать без IFS",
-        'load_error': "!! Ошибка загрузки / выгрузки\n{}",
-        'load_success': "Загрузка началась",
+        'hide_color_selection': "Скрыть выбор цвета",
         'load': "Загрузить",
         'no_prepared_data_scanning': "Подготовленные данные о цвете не найдены. Сканирование файла",
         'no_response': "!! Нет ответа от принтера. Настройте на родном экране принтера: \"Настройки\" -> \"WiFi\" -> \"Сетевой режим\" -> \"Только локальные сети\"\n{}",
@@ -76,10 +66,6 @@ TRANSLATIONS = {
         'select_type': "Выберите тип материала",
         'send_print': "Отправить на печать",
         'spool_info': "Катушка {}: {}/{}",
-        'spool': "Катушка",
-        'unload_error': "Ошибка выгрузки: {}",
-        'unload_success': "Выгрузка начата",
-        'unload': "Выгрузить",
         'grab': "Взять"
     },
     'en': {
@@ -90,7 +76,6 @@ TRANSLATIONS = {
         'auto_select_colors': "Auto select colors",
         'cancel': "Cancel",
         'change_color': "Change color",
-        'change_spool': "Changing to spool {}: {}/{}",
         'change_type': "Change type",
         'config_error': "!! Error changing color/type\n{}",
         'config_success': "Settings saved",
@@ -103,10 +88,7 @@ TRANSLATIONS = {
         'error_slot': "Invalid SLOT. Valid: 1-4",
         'error_tool': "Invalid T{}: {}. Valid: 1-4",
         'error_type': "Invalid material type: {}. Valid: {}",
-        'file_tool': "In file",
-        'hide_color_selection': "Hide color selection, print without IFS",
-        'load_error': "!! Load/unload error\n{}",
-        'load_success': "Loading started",
+        'hide_color_selection': "Hide color selection",
         'load': "Load",
         'no_prepared_data_scanning': "Pre-prepared color data not found. Scanning file",
         'no_response': "!! No response from printer. Configure via the printer screen menu: \"Settings\" -> \"WiFi\" -> \"Network Mode\" -> \"Local Only\"\n{}",
@@ -123,10 +105,6 @@ TRANSLATIONS = {
         'select_type': "Select material type",
         'send_print': "Start print",
         'spool_info': "Spool {}: {}/{}",
-        'spool': "in spool",
-        'unload_error': "Unloading error: {}",
-        'unload_success': "Unloading started",
-        'unload': "Unload",
         'grab': "Grab"
     },
     'de': {
@@ -137,7 +115,6 @@ TRANSLATIONS = {
         'auto_select_colors': "Farben auto-wählen",
         'cancel': "Abbrechen",
         'change_color': "Farbe ändern",
-        'change_spool': "Wechsle zu Spule {}: {}/{}",
         'change_type': "Typ ändern",
         'config_error': "!! Fehler beim Ändern von Farbe/Typ\n{}",
         'config_success': "Einstellungen gespeichert",
@@ -150,10 +127,7 @@ TRANSLATIONS = {
         'error_slot': "Ungültiger SLOT. Erlaubt: 1-4",
         'error_tool': "Ungültiges T{}: {}. Erlaubt: 1-4",
         'error_type': "Ungültiger Materialtyp: {}. Erlaubt: {}",
-        'file_tool': "In Datei",
-        'hide_color_selection': "Farbauswahl ausblenden, ohne IFS drucken",
-        'load_error': "!! Fehler beim Laden/Entladen\n{}",
-        'load_success': "Laden gestartet",
+        'hide_color_selection': "Farbauswahl ausblenden",
         'load': "Laden",
         'no_prepared_data_scanning': "Vorbereitete Farbdaten nicht gefunden. Datei wird gescannt",
         'no_response': "!! Keine Antwort vom Drucker. Gehen Sie im Bildschirmmenü des Druckers zu: \"Einstellungen\" -> \"WLAN\" -> \"Netzwerkmodus\" -> \"Nur lokal\"\n{}",
@@ -170,10 +144,6 @@ TRANSLATIONS = {
         'select_type': "Materialtyp auswählen",
         'send_print': "Druck starten",
         'spool_info': "Spule {}: {}/{}",
-        'spool': "in Spule",
-        'unload_error': "Fehler beim Entladen: {}",
-        'unload_success': "Entladen gestartet",
-        'unload': "Entladen",
         'grab': "Greifen"
     },
     'fr': {
@@ -184,7 +154,6 @@ TRANSLATIONS = {
         'auto_select_colors': "Sélection auto couleurs",
         'cancel': "Annuler",
         'change_color': "Changer la couleur",
-        'change_spool': "Changement vers la bobine {}: {}/{}",
         'change_type': "Changer le type",
         'config_error': "!! Erreur lors du changement de couleur/type\n{}",
         'config_success': "Paramètres enregistrés",
@@ -197,10 +166,7 @@ TRANSLATIONS = {
         'error_slot': "Emplacement SLOT invalide. Autorisé: 1-4",
         'error_tool': "Outil T{} invalide: {}. Autorisé: 1-4",
         'error_type': "Type de matériau invalide: {}. Autorisé: {}",
-        'file_tool': "Dans le fichier",
-        'hide_color_selection': "Masquer la sélection des couleurs, imprimer sans IFS",
-        'load_error': "!! Erreur de chargement/déchargement\n{}",
-        'load_success': "Chargement commencé",
+        'hide_color_selection': "Masquer la sélection des couleurs",
         'load': "Charger",
         'no_prepared_data_scanning': "Données de couleur préparées non trouvées. Scan du fichier",
         'no_response': "!! Aucune réponse de l'imprimante. Configurez via : \"Paramètres\" -> \"WiFi\" -> \"Mode réseau\" -> \"Réseau local uniquement\"\n{}",
@@ -217,10 +183,6 @@ TRANSLATIONS = {
         'select_type': "Sélectionner un type de matériau",
         'send_print': "Démarrer l'impression",
         'spool_info': "Bobine {}: {}/{}",
-        'spool': "dans la bobine",
-        'unload_error': "Erreur de déchargement : {}",
-        'unload_success': "Déchargement commencé",
-        'unload': "Décharger",
         'grab': "Saisir"
     },
     'it': {
@@ -231,7 +193,6 @@ TRANSLATIONS = {
         'auto_select_colors': "Selezione auto colori",
         'cancel': "Annulla",
         'change_color': "Cambia colore",
-        'change_spool': "Cambio a bobina {}: {}/{}",
         'change_type': "Cambia tipo",
         'config_error': "!! Errore durante la modifica di colore/tipo\n{}",
         'config_success': "Impostazioni salvate",
@@ -244,10 +205,7 @@ TRANSLATIONS = {
         'error_slot': "Slot non valido. Consentiti: 1-4",
         'error_tool': "Strumento T{} non valido: {}. Consentiti: 1-4",
         'error_type': "Tipo di materiale non valido: {}. Consentiti: {}",
-        'file_tool': "Nel file",
-        'hide_color_selection': "Nascondi selezione colore, stampa senza IFS",
-        'load_error': "!! Errore di caricamento/scaricamento\n{}",
-        'load_success': "Caricamento avviato",
+        'hide_color_selection': "Nascondi selezione colore",
         'load': "Carica",
         'no_prepared_data_scanning': "Dati colore preparati non trovati. Scansione del file",
         'no_response': "!! Nessuna risposta dalla stampante. Configura tramite: \"Impostazioni\" -> \"WiFi\" -> \"Modalità rete\" -> \"Solo locale\"\n{}",
@@ -264,10 +222,6 @@ TRANSLATIONS = {
         'select_type': "Seleziona tipo di materiale",
         'send_print': "Avvia stampa",
         'spool_info': "Bobina {}: {}/{}",
-        'spool': "nella bobina",
-        'unload_error': "Errore di scaricamento: {}",
-        'unload_success': "Scaricamento avviato",
-        'unload': "Scarica",
         'grab': "Prendi"
     },
     'es': {
@@ -278,7 +232,6 @@ TRANSLATIONS = {
         'auto_select_colors': "Selección auto colores",
         'cancel': "Cancelar",
         'change_color': "Cambiar color",
-        'change_spool': "Cambiando a carrete {}: {}/{}",
         'change_type': "Cambiar tipo",
         'config_error': "!! Error al cambiar color/tipo\n{}",
         'config_success': "Configuración guardada",
@@ -291,10 +244,7 @@ TRANSLATIONS = {
         'error_slot': "Ranura SLOT inválida. Permitidas: 1-4",
         'error_tool': "Herramienta T{} inválida: {}. Permitidas: 1-4",
         'error_type': "Tipo de material inválido: {}. Permitidos: {}",
-        'file_tool': "En el archivo",
-        'hide_color_selection': "Ocultar selección de color, imprimir sin IFS",
-        'load_error': "!! Error de carga/descarga\n{}",
-        'load_success': "Carga iniciada",
+        'hide_color_selection': "Ocultar selección de color",
         'load': "Cargar",
         'no_prepared_data_scanning': "Datos de color preparados no encontrados. Escaneando archivo",
         'no_response': "!! Sin respuesta de la impresora. Configure en: \"Ajustes\" -> \"WiFi\" -> \"Modo de red\" -> \"Solo local\"\n{}",
@@ -311,10 +261,6 @@ TRANSLATIONS = {
         'select_type': "Seleccionar tipo de material",
         'send_print': "Iniciar impresión",
         'spool_info': "Carrete {}: {}/{}",
-        'spool': "en el carrete",
-        'unload_error': "Error de descarga: {}",
-        'unload_success': "Descarga iniciada",
-        'unload': "Descargar",
         'grab': "Tomar"
     },
     'zh': {
@@ -325,7 +271,6 @@ TRANSLATIONS = {
         'auto_select_colors': "自动选择颜色",
         'cancel': "取消",
         'change_color': "更改颜色",
-        'change_spool': "正在切换到线轴{}: {}/{}",
         'change_type': "更改类型",
         'config_error': "!! 颜色/类型更改错误\n{}",
         'config_success': "设置已保存",
@@ -338,10 +283,7 @@ TRANSLATIONS = {
         'error_slot': "无效的SLOT。允许值：1-4",
         'error_tool': "无效的T{}: {}。允许值：1-4",
         'error_type': "无效的材料类型: {}。允许值：{}",
-        'file_tool': "文件中",
-        'hide_color_selection': "隐藏颜色选择，在没有 IFS 的情况下打印",
-        'load_error': "!! 加载/卸载错误\n{}",
-        'load_success': "开始加载",
+        'hide_color_selection': "隐藏颜色选择",
         'load': "加载",
         'no_prepared_data_scanning': "未找到预设颜色数据。正在扫描文件",
         'no_response': "!! 打印机无响应。请通过以下方式配置：\"设置\" -> \"WiFi\" -> \"网络模式\" -> \"仅本地网络\"\n{}",
@@ -358,10 +300,6 @@ TRANSLATIONS = {
         'select_type': "选择材料类型",
         'send_print': "开始打印",
         'spool_info': "线轴{}: {}/{}",
-        'spool': "在线轴中",
-        'unload_error': "卸载错误：{}",
-        'unload_success': "开始卸载",
-        'unload': "卸载",
         'grab': "抓取"
     },
     'ja': {
@@ -372,7 +310,6 @@ TRANSLATIONS = {
         'auto_select_colors': "色を自動選択",
         'cancel': "キャンセル",
         'change_color': "色を変更",
-        'change_spool': "スプール{}に変更中: {}/{}",
         'change_type': "タイプを変更",
         'config_error': "!! 色/タイプ変更エラー\n{}",
         'config_success': "設定が保存されました",
@@ -385,10 +322,7 @@ TRANSLATIONS = {
         'error_slot': "無効なSLOTです。1-4が有効",
         'error_tool': "無効なT{}: {}。1-4が有効",
         'error_type': "無効な材料タイプ: {}。有効なタイプ：{}",
-        'file_tool': "ファイル内",
-        'hide_color_selection': "カラー選択を非表示、IFSなしで印刷",
-        'load_error': "!! 読み込み/排出エラー\n{}",
-        'load_success': "読み込み開始",
+        'hide_color_selection': "カラー選択を非表示",
         'load': "読み込む",
         'no_prepared_data_scanning': "事前準備されたカラーデータが見つかりません。ファイルをスキャン中",
         'no_response': "!! プリンターから応答なし。設定方法：\"設定\" -> \"WiFi\" -> \"ネットワークモード\" -> \"ローカルのみ\"\n{}",
@@ -405,10 +339,6 @@ TRANSLATIONS = {
         'select_type': "材料タイプを選択",
         'send_print': "印刷を開始",
         'spool_info': "スプール{}: {}/{}",
-        'spool': "スプール内",
-        'unload_error': "排出エラー：{}",
-        'unload_success': "排出を開始",
-        'unload': "排出する",
         'grab': "掴む"
     },
     'ko': {
@@ -419,7 +349,6 @@ TRANSLATIONS = {
         'auto_select_colors': "색상 자동 선택",
         'cancel': "취소",
         'change_color': "색상 변경",
-        'change_spool': "스풀 {}로 교체 중: {}/{}",
         'change_type': "유형 변경",
         'config_error': "!! 색상/유형 변경 오류\n{}",
         'config_success': "설정이 저장되었습니다",
@@ -432,10 +361,7 @@ TRANSLATIONS = {
         'error_slot': "잘못된 SLOT. 1-4만 허용",
         'error_tool': "잘못된 T{}: {}. 1-4만 허용",
         'error_type': "잘못된 재료 유형: {}. 허용된 유형: {}",
-        'file_tool': "파일 내",
-        'hide_color_selection': "색상 선택 숨기기, IFS 없이 인쇄",
-        'load_error': "!! 로드/언로드 오류\n{}",
-        'load_success': "로드 시작",
+        'hide_color_selection': "색상 선택 숨기기",
         'load': "로드",
         'no_prepared_data_scanning': "사전 준비된 색상 데이터를 찾을 수 없습니다. 파일을 스캔하는 중",
         'no_response': "!! 프린터 응답 없음. 설정 방법: \"설정\" -> \"WiFi\" -> \"네트워크 모드\" -> \"로컬 전용\"\n{}",
@@ -452,10 +378,6 @@ TRANSLATIONS = {
         'select_type': "재료 유형 선택",
         'send_print': "인쇄 시작",
         'spool_info': "스풀 {}: {}/{}",
-        'spool': "스풀 내",
-        'unload_error': "언로드 오류: {}",
-        'unload_success': "언로드 시작",
-        'unload': "언로드",
         'grab': "잡기"
     },
     'pt': {
@@ -466,23 +388,19 @@ TRANSLATIONS = {
         'auto_select_colors': "Seleção auto de cores",
         'cancel': "Cancelar",
         'change_color': "Alterar cor",
-        'change_spool': "Mudando para bobina {}: {}/{}",
         'change_type': "Alterar tipo",
         'config_error': "!! Erro ao alterar cor/tipo\n{}",
         'config_success': "Configurações salvas",
         'error_auto_assign_result': "Falha na atribuição auto de carretel, código de retorno {}",
         'error_color_or_type': "Especifique HEX ou TIPO",
-        'error_leveling': "AUTOPA inválido: {}. Válido: 0 ou 1",
+        'error_leveling': "LEVELING inválido: {}. Válido: 0 ou 1",
         'error_autopa': "AUTOPA inválido: {}. Válido: 0 ou 1",
         'error_napr': "Direção inválida (0-1)",
         'error_no_filename': "Parâmetro NOME_DO_ARQUIVO faltando",
         'error_slot': "SLOT inválido. Válido: 1-4",
         'error_tool': "T{} inválido: {}. Válido: 1-4",
         'error_type': "Tipo de material inválido: {}. Válido: {}",
-        'file_tool': "No arquivo",
-        'hide_color_selection': "Ocultar seleção de cores, imprimir sem IFS",
-        'load_error': "!! Erro de carregamento/descarga\n{}",
-        'load_success': "Carregamento iniciado",
+        'hide_color_selection': "Ocultar seleção de cores",
         'load': "Carregar",
         'no_prepared_data_scanning': "Dados de cores preparados não encontrados. Escaneando arquivo",
         'no_response': "!! Sem resposta da impressora. Configure via: \"Configurações\" -> \"WiFi\" -> \"Modo de Rede\" -> \"Apenas Local\"\n{}",
@@ -499,10 +417,6 @@ TRANSLATIONS = {
         'select_type': "Selecionar tipo de material",
         'send_print': "Iniciar impressão",
         'spool_info': "Bobina {}: {}/{}",
-        'spool': "na bobina",
-        'unload_error': "Erro ao descarregar: {}",
-        'unload_success': "Descarga iniciada",
-        'unload': "Descarregar",
         'grab': "Pegar"
     },
     "cs": {
@@ -513,7 +427,6 @@ TRANSLATIONS = {
         'auto_select_colors': "Automatický výběr barev",
         "cancel": "Zrušit",
         "change_color": "Změnit barvu",
-        "change_spool": "Měním na cívku {}: {} / {}",
         "change_type": "Změnit typ",
         "config_error": "!! Chyba při změně barvy / typu\n{}",
         "config_success": "Nastavení uložena",
@@ -526,10 +439,7 @@ TRANSLATIONS = {
         "error_slot": "Neplatný SLOT. Povolené: 1–4",
         "error_tool": "Neplatný T{}: {}. Povoleno: 1–4",
         "error_type": "Neplatný typ materiálu: {}. Povoleno: {}",
-        "file_tool": "Soubor",
-        'hide_color_selection': "Skrýt výběr barev, tisknout bez IFS",
-        "load_error": "!! Chyba při zavádění / vyndávání\n{}",
-        "load_success": "Zavádění spuštěno",
+        'hide_color_selection': "Skrýt výběr barev",
         "load": "Zavést",
         'no_prepared_data_scanning': "Předpřipravená barevná data nebyla nalezena. Skenování souboru",
         "no_response": "!! Tiskárna neodpovídá. Nastavte tiskárnu: „Nastavení“ → „WiFi“ → „Síťový režim“ → „Pouze místní sítě“\n{}",
@@ -546,10 +456,6 @@ TRANSLATIONS = {
         "select_type": "Vyberte typ materiálu",
         "send_print": "Odeslat k tisku",
         "spool_info": "Cívka {}: {}/{}",
-        "spool": "Cívka",
-        "unload_error": "Chyba vyndávání: {}",
-        "unload_success": "Vyndávání spuštěno",
-        "unload": "Vyndat",
         'grab': "Uchopit"
     },
     'tr': {
@@ -560,23 +466,19 @@ TRANSLATIONS = {
         'auto_select_colors': "Renkleri otomatik seç",
         'cancel': "İptal",
         'change_color': "Rengi değiştir",
-        'change_spool': "{} no'lu makaraya geçiliyor: {}/{}",
         'change_type': "Türü değiştir",
         'config_error': "!! Renk/tür değiştirme hatası\n{}",
         'config_success': "Ayarlar kaydedildi",
         'error_auto_assign_result': "Makara otomatik atama hatası, dönüş kodu {}",
         'error_color_or_type': "HEX veya TÜR belirtin",
-        'error_leveling': "Geçersiz AUTOPA: {}. Geçerli: 0 veya 1",
+        'error_leveling': "Geçersiz LEVELING: {}. Geçerli: 0 veya 1",
         'error_autopa': "Geçersiz AUTOPA: {}. Geçerli: 0 veya 1",
         'error_napr': "Geçersiz yön (0-1)",
         'error_no_filename': "DOSYA_ADI parametresi eksik",
         'error_slot': "Geçersiz YUVAL. Geçerli: 1-4",
         'error_tool': "Geçersiz T{}: {}. Geçerli: 1-4",
         'error_type': "Geçersiz malzeme türü: {}. Geçerli: {}",
-        'file_tool': "Dosyada",
-        'hide_color_selection': "Renk seçimini gizle, IFS olmadan yazdır",
-        'load_error': "!! Yükleme/boşaltma hatası\n{}",
-        'load_success': "Yükleme başlatıldı",
+        'hide_color_selection': "Renk seçimini gizle",
         'load': "Yükle",
         'no_prepared_data_scanning': "Önceden hazırlanmış renk verisi bulunamadı. Dosya taranıyor",
         'no_response': "!! Yazıcıdan yanıt alınamadı. Şu yolla yapılandırın: \"Ayarlar\" -> \"WiFi\" -> \"Ağ Modu\" -> \"Sadece Yerel\"\n{}",
@@ -593,10 +495,6 @@ TRANSLATIONS = {
         'select_type': "Malzeme türünü seçin",
         'send_print': "Yazdırmayı başlat",
         'spool_info': "Makaradaki {}: {}/{}",
-        'spool': "makara",
-        'unload_error': "Boşaltma hatası: {}",
-        'unload_success': "Boşaltma başlatıldı",
-        'unload': "Boşalt",
         'grab': "Yakala"
     }
 }
@@ -1058,7 +956,10 @@ class zmod_color:
         return states
 
     def _t(self, key, *args):
-        return TRANSLATIONS[self.lang][key].format(*args)
+        # Неизвестный язык (pl, uk, ...) или отсутствующий ключ -> английский
+        translations = TRANSLATIONS.get(self.lang) or TRANSLATIONS['en']
+        template = translations.get(key) or TRANSLATIONS['en'][key]
+        return template.format(*args)
 
     def parse_printer_response(self, response_data):
         slots_info = []
@@ -1134,14 +1035,12 @@ class zmod_color:
         cmd_time = self.printer.get_reactor().monotonic()
 
         for i in range(4):
-            is_home = False
             home_obj = self.home_objs[i]
 
             if home_obj is not None:
                 if home_obj.get_status(cmd_time).get('state', '') == "RELEASED":
                     not_home_indices.append(i)
 
-            is_on_head = True
             grab_obj = self.grab_objs[i]
             if grab_obj is not None:
                 if grab_obj.get_status(cmd_time).get('state', '') == "PRESSED":
@@ -1255,8 +1154,6 @@ class zmod_color:
             gcmd.respond_raw(f"// zoffset.json: Error reading file ({str(e)})")
 
     def cmd_T_G28(self, gcmd):
-        params = gcmd.get_command_parameters()
-
         raw_string = gcmd.get('RAW', '').lower()
         params_str = "".join(re.findall(r'[xyz]', raw_string))
 
@@ -1341,7 +1238,7 @@ class zmod_color:
     def cmd_T_IN(self, gcmd):
         t_index = gcmd.get_int('T', None)
         if t_index is None or t_index < 0 or t_index > 3:
-            raise gcmd.error("Error: T parameter is required and must be between -1 and 3")
+            raise gcmd.error("Error: T parameter is required and must be between 0 and 3")
         silent = gcmd.get_int('SILENT', 1)
 
         homed_axes = self.toolhead.get_status(self.printer.get_reactor().monotonic()).get('homed_axes', '').lower()
@@ -1804,7 +1701,11 @@ class zmod_color:
         color_data_line = ''
         found_data = False
 
-        with open(f"/usr/data/gcodes/{fname}", 'r', encoding='utf-8') as f:
+        try:
+            f = open(f"/usr/data/gcodes/{fname}", 'r', encoding='utf-8', errors='ignore')
+        except OSError as e:
+            raise gcmd.error(f"Cannot read G-code file '{fname}': {e}")
+        with f:
             for line_raw in f:
                 line = line_raw.strip().casefold()
                 if len(line) == 0:
@@ -1869,6 +1770,23 @@ class zmod_color:
 
         return (found_data, sorted_colors)
 
+    @staticmethod
+    def _parse_hex_color(value):
+        """'#RRGGBB', 'RRGGBB', '#RRGGBBAA', '#RGB' -> (r, g, b) или None."""
+        if not isinstance(value, str):
+            return None
+        v = value.strip().strip('"\'').lstrip('#')
+        if len(v) in (3, 4):
+            v = ''.join(c * 2 for c in v[:3])
+        elif len(v) in (6, 8):
+            v = v[:6]
+        else:
+            return None
+        try:
+            return int(v[0:2], 16), int(v[2:4], 16), int(v[4:6], 16)
+        except ValueError:
+            return None
+
     def get_auto_tool_assignments(self, gcmd, orig_tools, raw_slots, output_text, one_based_indexes):
         if len(raw_slots) == 0:
             return AUTO_ASSIGN_MATERIAL_FAILURE | AUTO_ASSIGN_COLOR_FAILURE
@@ -1910,7 +1828,8 @@ class zmod_color:
                         result_flags |= AUTO_ASSIGN_ANY_SUCCESS
                         this_material_failure = False
 
-                    if file_color[1] == '':
+                    file_rgb = self._parse_hex_color(file_color[1])
+                    if file_rgb is None:
                         result_flags |= AUTO_ASSIGN_COLOR_FAILURE
                         if not this_material_failure:
                             tools[iTool] = int(candidates[0]['ID'])
@@ -1921,9 +1840,7 @@ class zmod_color:
                     closest_slot_difference = float('inf')
 
                     # Преобразуем цвет файла в LAB один раз
-                    fc_r = int(file_color[1][1:3], 16)
-                    fc_g = int(file_color[1][3:5], 16)
-                    fc_b = int(file_color[1][5:7], 16)
+                    fc_r, fc_g, fc_b = file_rgb
                     fl, fa, fb = self.rgb_to_lab(fc_r, fc_g, fc_b)
 
                     for slot in candidates:
@@ -2148,10 +2065,7 @@ class zmod_color:
                 gcmd.respond_raw(f"// {leveling_text}")
                 gcmd.respond_raw(f"// {autopa_text}")
                 gcmd.respond_raw("// SAVE_ZMOD_DATA SILENT=1")
-                if self.lang == 'ru':
-                    gcmd.respond_raw("Скрыть выбор цвета")
-                else:
-                    gcmd.respond_raw("Hide color selection")
+                gcmd.respond_raw(self._t('hide_color_selection'))
 
                 if auto_assign > 1:
                     # Success bit flag is ignored
@@ -2263,8 +2177,16 @@ class zmod_color:
                 else:
                     gcmd.respond_raw(self._t('printing_error', response_data2))
             else:
+                if self.zmod is None or not hasattr(self.zmod, '_extract_3mf_gcode'):
+                    raise gcmd.error("zmod module is not loaded or too old (no _extract_3mf_gcode)")
                 fname = self.zmod._extract_3mf_gcode(fname, gcmd)
-                file_channel, bed_temp = self.find_t_code(fname)
+                try:
+                    file_channel, bed_temp = self.find_t_code(fname)
+                except OSError as e:
+                    raise gcmd.error(f"Cannot read G-code file '{fname}': {e}")
+                if file_channel >= len(tools):
+                    raise gcmd.error(
+                        f"File starts with T{file_channel}, but only {len(tools)} tool(s) are mapped")
                 t_start = tools[file_channel] - 1
 
                 self.physical_pa = [99.0, 99.0, 99.0, 99.0]
@@ -2324,7 +2246,7 @@ class zmod_color:
         found_t = False
         found_bed = False
 
-        with open(f"{self.virtual_sd.sdcard_dirname}/{filename}", 'r', encoding='utf-8') as file:
+        with open(f"{self.virtual_sd.sdcard_dirname}/{filename}", 'r', encoding='utf-8', errors='ignore') as file:
             for i, line in enumerate(file):
                 if i > 3000:
                     break
@@ -2425,7 +2347,7 @@ class zmod_color:
     def cmd_RUN_ZCOLOR(self, gcmd):
         gcmd.respond_raw("// action:prompt_end")
         zslot = gcmd.get_int('SLOT', 0)
-        if zslot < 0 or zslot > self.color_limit:
+        if zslot < 1 or zslot > self.color_limit:
             raise gcmd.error(self._t('error_slot'))
 
         zhex = gcmd.get('HEX', '161616').upper()
@@ -2488,7 +2410,7 @@ class zmod_color:
         gcmd.respond_raw("// action:prompt_end")
         hide = gcmd.get_int('HIDE', 0)
         zslot = gcmd.get_int('SLOT', 0)
-        if zslot < 0 or zslot > self.color_limit:
+        if zslot < 1 or zslot > self.color_limit:
             raise gcmd.error(self._t('error_slot'))
 
         zhex = gcmd.get('HEX', '').upper()
@@ -2594,7 +2516,7 @@ class zmod_color:
         nocolor = gcmd.get_int('NOCOLOR', 0)
         hide = gcmd.get_int('HIDE', 0)
         zslot = gcmd.get_int('SLOT', 0)
-        if zslot < 0 or zslot > self.color_limit:
+        if zslot < 1 or zslot > self.color_limit:
             raise gcmd.error(self._t('error_slot'))
 
         slot_config = self.get_filament_config_t(zslot - 1)
@@ -2664,7 +2586,7 @@ class zmod_color:
         bed_temp = gcmd.get_float('BED_TEMP', 65.0)
         t = gcmd.get_int('T', 0)
         if t < 0 or t >= self.color_limit:
-            raise gcmd.error(self._t('error_slot'))
+            raise gcmd.error(f"Error: T parameter must be between 0 and {self.color_limit - 1}, got {t}")
 
         slot_config = self.get_filament_config_t(t)
 
@@ -2682,8 +2604,7 @@ class zmod_color:
         if not is_absolute:
             self.gcode.run_script_from_command("G90")
 
-        current_z_offset = self.gcode_move.homing_position[2]
-        wiper_z = slot_config.get('wiper_z')# - current_z_offset
+        wiper_z = slot_config.get('wiper_z')
 
         script = [
             "SET_GCODE_VARIABLE MACRO=_WAIT_E_VARS VARIABLE=start_e0 VALUE=0",
@@ -2717,7 +2638,7 @@ class zmod_color:
             ]
         script += ["_ENABLE_SENSOR",
             "G1 X250 F6000",                              # Идем к резинке
-            f"_WIPER X={slot_config.get('wiper_x'):.3f} Y={slot_config.get('wiper_y'):.3f} Z={wiper_z:.3f} START=1"
+            f"_WIPER X={slot_config.get('wiper_x'):.3f} Y={slot_config.get('wiper_y'):.3f} Z={wiper_z:.3f} START=1",
             "M114"
         ]
         if float(slot_config.get('filament_drop_length', 0)) == 0.0:
@@ -2960,10 +2881,11 @@ class zmod_color:
                 tool_val = tools[idx]
                 script.append(f"SDCARD_SET_GCODE_EX_USED_BASE INDEX={idx} EXTRUDER=T{idx}")
                 script.append(f"SDCARD_SET_GCODE_EX_USED_CHANGED INDEX={idx} EXTRUDER=T{tool_val-1}")
+            self.gcode.run_script_from_command("\n".join(script))
 
             self.set_autopa(gcmd)
 
-            script += [
+            script = [
                 "SDCARD_SET_NEED_CHECK_EX CHECK=1",
                 f"SDCARD_SET_CHANNEL CHANNEL={t_new}",
                 f"_A_CHANGE_FILAMENT T={t_new} RESTORE_TEMP=1 RESTORE_POSITION=1"
@@ -3360,7 +3282,7 @@ class zmod_color:
             "BED_MESH_CLEAR FROM=_T_CALIBRATE_EXTRUDERS",
             "_SET_GCODE_OFFSET_FAST X=0 Y=0 Z=0 MOVE=0 MOVE_SPEED=600 FROM=_T_CALIBRATE_EXTRUDERS",
             "M400",
-            f"_WAIT_TEMP T=0 EXTRUDER_TEMP=0 BED_TEMP={bed_temp:.1f} DELTA_BED=0.1 FROM=_T_CALIBRATE_EXTRUDER",
+            f"_WAIT_TEMP T=0 EXTRUDER_TEMP=0 BED_TEMP={bed_temp:.1f} DELTA_BED=0.1 FROM=_T_CALIBRATE_EXTRUDERS",
             "SET_VELOCITY_LIMIT ACCEL=100",
             "M400",
         ]
@@ -3421,7 +3343,7 @@ class zmod_color:
                     f"G1 Y{trash_y:.3f} F24000",
                     f"G1 X{trash_x:.3f} F2400",
                     "M400",
-                    f"_WAIT_TEMP T={t_idx} EXTRUDER_TEMP={purge_temp:.3f} BED_TEMP={bed_temp:.1f} FROM=_T_CALIBRATE_EXTRUDER",
+                    f"_WAIT_TEMP T={t_idx} EXTRUDER_TEMP={purge_temp:.3f} BED_TEMP={bed_temp:.1f} FROM=_T_CALIBRATE_EXTRUDERS",
                     "G92 E0",
                     f"G1 E{drop_len:.3f} F240",
                     "M400",
@@ -3431,7 +3353,7 @@ class zmod_color:
                     "M400",
                     "G1 X250 F6000",
                     f"_WIPER X={wiper_x:.3f} Y={wiper_y:.3f} Z={wiper_z:.3f} START=1",
-                    f"_WAIT_TEMP T={t_idx} EXTRUDER_TEMP={wait_temp:.3f} DELTA_T=0.5 BED_TEMP={bed_temp:.1f} DELTA_BED=0.1 FROM=_T_CALIBRATE_EXTRUDER",
+                    f"_WAIT_TEMP T={t_idx} EXTRUDER_TEMP={wait_temp:.3f} DELTA_T=0.5 BED_TEMP={bed_temp:.1f} DELTA_BED=0.1 FROM=_T_CALIBRATE_EXTRUDERS",
                     f"_WIPER X={wiper_x:.3f} Y={wiper_y:.3f} Z={wiper_z:.3f} START=0",
                     "M106 P1 S0",
                     f"G1 Z{safe_z:.2f} F1200",
