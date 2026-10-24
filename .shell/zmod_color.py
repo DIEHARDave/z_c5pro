@@ -1683,7 +1683,12 @@ class zmod_color:
         except OSError as e:
             raise gcmd.error(f"Cannot read G-code file '{fname}': {e}")
         with f:
+            lines = 0
             for line_raw in f:
+                lines += 1
+                if lines % 10000 == 0:
+                    self.zmod._yield_reactor(0.1)
+
                 line = line_raw.strip().casefold()
                 if len(line) == 0:
                     continue
