@@ -15,6 +15,13 @@ POLY_RE = re.compile(r'POLYGON=\[\[(.*?)\]\]')
 NUM_RE = re.compile(r'-?\d+(?:\.\d+)?')
 PLATE_GCODE_RE = re.compile(r'Metadata/plate_(\d+)\.gcode')
 
+# Распаковка 3mf блокирует реактор Klipper (иначе: MCU shutdown: Timer too close),
+# поэтому периодически отдаём управление реактору
+UNPACK_CHUNK = 16384          # размер блока чтения/записи
+UNPACK_PAUSE_EVERY = 64       # пауза раз в N блоков (64 * 16 КБ = 1 МБ)
+UNPACK_PAUSE_TIME = 0.1       # длительность паузы, сек
+METADATA_PAUSE_TIME = 1.0     # пауза после запуска metascan, чтобы Moonraker начал работу
+
 FFCONFIG1='/usr/prog/config/Adventurer5M.json'
 FFCONFIG2='/opt/config/Adventurer5M.json'
 
@@ -45,6 +52,11 @@ class zmod:
     def _handle_ready(self):
         self.virtual_sdcard = self.printer.lookup_object('virtual_sdcard')
         self.sdcard_dirname = self.virtual_sdcard.sdcard_dirname
+        self.reactor = self.printer.get_reactor()
+
+    def _yield_reactor(self, seconds):
+        """Отдать управление реактору Klipper на seconds секунд."""
+        self.reactor.pause(self.reactor.monotonic() + seconds)
 
     # PLATE
     def cmd_SDCARD_PRINT_FILE_MF(self, gcmd):
@@ -215,19 +227,27 @@ class zmod:
                         expected_md5 = raw_md5_content.split()[0].lower()
 
                 with zip_ref.open(gcode_in_zip) as source, open(target_gcode_path, 'wb') as target:
+                    blocks = 0
                     while True:
-                        chunk = source.read(16384)
+                        chunk = source.read(UNPACK_CHUNK)
                         if not chunk:
                             break
                         target.write(chunk)
+                        blocks += 1
+                        if blocks % UNPACK_PAUSE_EVERY == 0:
+                            self._yield_reactor(UNPACK_PAUSE_TIME)
 
                 md5_hash = hashlib.md5()
                 with open(target_gcode_path, 'rb') as f_check:
+                    blocks = 0
                     while True:
-                        chunk = f_check.read(16384)
+                        chunk = f_check.read(UNPACK_CHUNK)
                         if not chunk:
                             break
                         md5_hash.update(chunk)
+                        blocks += 1
+                        if blocks % UNPACK_PAUSE_EVERY == 0:
+                            self._yield_reactor(UNPACK_PAUSE_TIME)
 
                 current_md5 = md5_hash.hexdigest().lower()
 
@@ -238,6 +258,8 @@ class zmod:
                     raise ValueError("MD5_MISMATCH")
 
                 self.update_metadata_async(rel_gcode)
+                # Даём Moonraker начать сканирование, прежде чем Klipper продолжит подготовку печати
+                self._yield_reactor(METADATA_PAUSE_TIME)
 
             return rel_gcode
         except Exception as e:
