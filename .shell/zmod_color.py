@@ -1958,7 +1958,7 @@ class zmod_color:
                             prompt_text = f"Extruder: {self.get_current_channel()}: {slot['Material']}/{slot['Color']}"
                             break
 
-                gcmd.respond_raw(f"// action:prompt_text {fname}|{prompt_text}")
+                gcmd.respond_raw(f"// action:prompt_text {fname}[{plate}]|{prompt_text}")
 
                 # Кнопка платы (только если нарезано больше одной): листает нарезанные платы по кругу
                 if len(self.file_plates) > 1:
