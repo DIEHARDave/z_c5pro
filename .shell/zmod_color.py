@@ -10,6 +10,7 @@ FILE_CONFIG='/usr/data/config/mod_data/file.json'
 TYPECONFIG='/usr/data/config/mod_data/filament.json'
 MAX_COLOR=98
 THROTTLE_LINES = 32     # в циклах по строкам файла проверять время (zmod._throttle) раз в N строк
+SKIP_LINE_FIRST_CHARS = frozenset('GMXYZEFgmxyzef')
 
 NO_EXCLUDE_FIELDS = ['temp']
 
@@ -1690,6 +1691,9 @@ class zmod_color:
                 lines += 1
                 if lines % THROTTLE_LINES == 0:
                     self.zmod._throttle()
+
+                if line_raw[:1] in SKIP_LINE_FIRST_CHARS:
+                    continue
 
                 line = line_raw.strip().casefold()
                 if len(line) == 0:
