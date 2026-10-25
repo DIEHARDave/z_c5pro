@@ -15,12 +15,12 @@ POLY_RE = re.compile(r'POLYGON=\[\[(.*?)\]\]')
 NUM_RE = re.compile(r'-?\d+(?:\.\d+)?')
 PLATE_GCODE_RE = re.compile(r'Metadata/plate_(\d+)\.gcode')
 
-# Распаковка 3mf блокирует реактор Klipper (иначе: MCU shutdown: Timer too close),
-# поэтому периодически отдаём управление реактору
-UNPACK_CHUNK = 16384          # размер блока чтения/записи
-UNPACK_PAUSE_EVERY = 32       # пауза раз в N блоков (32 * 16 КБ = 0.5 МБ)
-LINE_PAUSE_EVERY = 20000      # пауза раз в 20000 строк
-UNPACK_PAUSE_TIME = 0.1       # длительность паузы, сек
+# Распаковка 3mf и разбор gcode блокируют реактор Klipper (иначе: MCU shutdown: Timer too close),
+# поэтому реактору периодически отдаётся управление: после WORK_SLICE секунд работы - пауза THROTTLE_PAUSE
+UNPACK_CHUNK = 16384          # размер блока чтения/записи при распаковке
+WORK_SLICE = 0.025            # сколько секунд подряд можно занимать реактор
+THROTTLE_PAUSE = 0.01         # длительность паузы, сек
+LINE_CHECK_EVERY = 32         # в циклах по строкам проверять время раз в N строк
 METADATA_PAUSE_TIME = 2.0     # пауза после запуска metascan, чтобы Moonraker начал работу
 
 FFCONFIG1='/usr/prog/config/Adventurer5M.json'
@@ -58,6 +58,17 @@ class zmod:
     def _yield_reactor(self, seconds):
         """Отдать управление реактору Klipper на seconds секунд."""
         self.reactor.pause(self.reactor.monotonic() + seconds)
+
+    def _throttle_reset(self):
+        """Начало долгой операции: отсчёт WORK_SLICE начинается заново."""
+        self._throttle_t = self.reactor.monotonic()
+
+    def _throttle(self):
+        """Вызывать в цикле долгой операции. Если реактор занят дольше WORK_SLICE - короткая пауза."""
+        now = self.reactor.monotonic()
+        if now - self._throttle_t >= WORK_SLICE:
+            self.reactor.pause(now + THROTTLE_PAUSE)
+            self._throttle_t = self.reactor.monotonic()
 
     # PLATE
     def cmd_SDCARD_PRINT_FILE_MF(self, gcmd):
@@ -229,28 +240,24 @@ class zmod:
 
                 gcmd.respond_raw(f"// 3MF: Unzip {fname}[{plate_num}]...")
                 with zip_ref.open(gcode_in_zip) as source, open(target_gcode_path, 'wb') as target:
-                    blocks = 0
+                    self._throttle_reset()
                     while True:
                         chunk = source.read(UNPACK_CHUNK)
                         if not chunk:
                             break
                         target.write(chunk)
-                        blocks += 1
-                        if blocks % UNPACK_PAUSE_EVERY == 0:
-                            self._yield_reactor(UNPACK_PAUSE_TIME)
+                        self._throttle()
 
                 gcmd.respond_raw(f"// 3MF: Check MD5 {fname}[{plate_num}]...")
                 md5_hash = hashlib.md5()
                 with open(target_gcode_path, 'rb') as f_check:
-                    blocks = 0
+                    self._throttle_reset()
                     while True:
                         chunk = f_check.read(UNPACK_CHUNK)
                         if not chunk:
                             break
                         md5_hash.update(chunk)
-                        blocks += 1
-                        if blocks % UNPACK_PAUSE_EVERY == 0:
-                            self._yield_reactor(UNPACK_PAUSE_TIME)
+                        self._throttle()
 
                 current_md5 = md5_hash.hexdigest().lower()
 
@@ -404,11 +411,12 @@ class zmod:
 
                 max_lines = 3000
                 line_num = 0
+                self._throttle_reset()
                 for line in f:
                     line_num += 1
 
-                    if line_num % LINE_PAUSE_EVERY == 0:
-                        self._yield_reactor(UNPACK_PAUSE_TIME)
+                    if line_num % LINE_CHECK_EVERY == 0:
+                        self._throttle()
 
                     # После лимита читаем дальше только пока не закончился первый слой
                     if line_num > max_lines and layer_state >= 2:
