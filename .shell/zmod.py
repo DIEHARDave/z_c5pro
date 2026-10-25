@@ -106,9 +106,23 @@ class zmod:
 
         threading.Thread(target=_worker, daemon=True).start()
 
+    def _rel_path(self, fname):
+        if not fname:
+            return fname
+        root = self.sdcard_dirname.rstrip('/')
+        fname = '/' + fname.lstrip('/')
+        if root:
+            for prefix in {root, os.path.realpath(root)}:
+                if fname == prefix:
+                    return ''
+                if fname.startswith(prefix + '/'):
+                    fname = fname[len(prefix):]
+                    break
+        return fname.lstrip('/')
+
     # 3MF
     def _3mf_path(self, fname):
-        fname = fname.lstrip('/')
+        fname = self._rel_path(fname)
         real_root = os.path.realpath(self.sdcard_dirname)
         path = os.path.join(self.sdcard_dirname, fname)
         if not os.path.realpath(path).startswith(real_root + os.sep):
@@ -212,7 +226,7 @@ class zmod:
         if not fname.lower().endswith('.3mf'):
             return fname
 
-        fname = fname.lstrip('/')
+        fname = self._rel_path(fname)
         src_3mf_path = os.path.join(self.sdcard_dirname, fname)
         p = Path(fname)
 
@@ -304,8 +318,7 @@ class zmod:
             gcmd.respond_raw("ZEXCLUDE_MF: FILENAME is required")
             return
 
-        if filename.startswith('/'):
-            filename = filename[1:]
+        filename = self._rel_path(filename)
         full_path = os.path.join(self.sdcard_dirname, filename)
 
         if not full_path.lower().endswith('.3mf'):
@@ -395,8 +408,7 @@ class zmod:
                 return
             full_path = file_path
         else:
-            if filename.startswith('/'):
-                filename = filename[1:]
+            filename = self._rel_path(filename)
             full_path = os.path.join(self.sdcard_dirname, filename)
 
         fast = gcmd.get_int("FAST", 0)
