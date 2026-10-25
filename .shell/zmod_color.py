@@ -2183,8 +2183,6 @@ class zmod_color:
                 else:
                     gcmd.respond_raw(self._t('printing_error', response_data2))
             else:
-                if self.zmod is None or not hasattr(self.zmod, '_extract_3mf_gcode'):
-                    raise gcmd.error("zmod module is not loaded or too old (no _extract_3mf_gcode)")
                 fname = self.zmod._extract_3mf_gcode(fname, gcmd)
                 try:
                     file_channel, bed_temp = self.find_t_code(fname)
