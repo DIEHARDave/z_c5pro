@@ -327,6 +327,10 @@ class zmod:
 
         plate_num = self.get_plate(gcmd, filename)
 
+        # Fix Orca bug
+        if plate_num != 1:
+            return
+
         try:
             with ZipFile(full_path, 'r') as zip_ref:
                 file_list = zip_ref.namelist()
