@@ -222,6 +222,7 @@ class zmod:
             gcmd.respond_raw(f"// 3MF: {debug}")
         return colors
 
+    # PLATE
     def _extract_3mf_gcode(self, fname, gcmd):
         if not fname.lower().endswith('.3mf'):
             return fname
@@ -300,6 +301,8 @@ class zmod:
                 # Даём Moonraker начать сканирование, прежде чем Klipper продолжит подготовку печати
                 self._yield_reactor(METADATA_PAUSE_TIME)
 
+                # Загружаем быстрые исключения
+                self.ZEXCLUDE_MF(gcmd)
             return rel_gcode
         except Exception as e:
             if str(e).startswith("INVALID_PLATE_NUM"):
