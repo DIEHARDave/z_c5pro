@@ -9,6 +9,7 @@ FFCONFIG='/usr/data/firmwareRes/config/'
 FILE_CONFIG='/usr/data/config/mod_data/file.json'
 TYPECONFIG='/usr/data/config/mod_data/filament.json'
 MAX_COLOR=98
+THROTTLE_LINES = 32     # в циклах по строкам файла проверять время (zmod._throttle) раз в N строк
 
 NO_EXCLUDE_FIELDS = ['temp']
 
@@ -1684,10 +1685,11 @@ class zmod_color:
             raise gcmd.error(f"Cannot read G-code file '{fname}': {e}")
         with f:
             lines = 0
+            self.zmod._throttle_reset()
             for line_raw in f:
                 lines += 1
-                if lines % 20000 == 0:
-                    self.zmod._yield_reactor(0.1)
+                if lines % THROTTLE_LINES == 0:
+                    self.zmod._throttle()
 
                 line = line_raw.strip().casefold()
                 if len(line) == 0:
@@ -2245,9 +2247,12 @@ class zmod_color:
         found_bed = False
 
         with open(f"{self.virtual_sd.sdcard_dirname}/{filename}", 'r', encoding='utf-8', errors='ignore') as file:
+            self.zmod._throttle_reset()
             for i, line in enumerate(file):
                 if i > 3000:
                     break
+                if i % THROTTLE_LINES == 0:
+                    self.zmod._throttle()
                 stripped_line = line.strip()
 
                 if not found_t:
@@ -3100,9 +3105,12 @@ class zmod_color:
                     file.seek(position - 1)
                     if file.read(1) != b'\n':
                         file.readline()
+                self.zmod._throttle_reset()
                 for i, line in enumerate(file):
                     if i > max_lines:
                         break
+                    if i % THROTTLE_LINES == 0:
+                        self.zmod._throttle()
                     match = pattern.match(line.strip())
                     if match:
                         return int(match.group(1))
