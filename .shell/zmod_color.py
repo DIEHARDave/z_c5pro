@@ -1722,6 +1722,8 @@ class zmod_color:
                         else:
                             gcmd.respond_raw(f"// {self._t('no_prepared_data_scanning')}")
 
+        self.zmod._throttle_done("scan colors")
+
         if color_data_line == '':
             filament_colors = filament_color_line.strip().split(';')
             filament_types = filament_type_line.strip().split(';')

@@ -16,10 +16,9 @@ NUM_RE = re.compile(r'-?\d+(?:\.\d+)?')
 PLATE_GCODE_RE = re.compile(r'Metadata/plate_(\d+)\.gcode')
 
 # Распаковка 3mf и разбор gcode блокируют реактор Klipper (иначе: MCU shutdown: Timer too close),
-# поэтому реактору периодически отдаётся управление: после WORK_SLICE секунд работы - пауза THROTTLE_PAUSE
+# поэтому после каждых WORK_SLICE секунд работы реактору отдаётся управление (reactor.pause(NOW):
 UNPACK_CHUNK = 16384          # размер блока чтения/записи при распаковке
-WORK_SLICE = 0.025            # сколько секунд подряд можно занимать реактор
-THROTTLE_PAUSE = 0.01         # длительность паузы, сек
+WORK_SLICE = 0.015            # сколько секунд подряд можно занимать реактор
 LINE_CHECK_EVERY = 32         # в циклах по строкам проверять время раз в N строк
 METADATA_PAUSE_TIME = 2.0     # пауза после запуска metascan, чтобы Moonraker начал работу
 
@@ -60,15 +59,28 @@ class zmod:
         self.reactor.pause(self.reactor.monotonic() + seconds)
 
     def _throttle_reset(self):
-        """Начало долгой операции: отсчёт WORK_SLICE начинается заново."""
-        self._throttle_t = self.reactor.monotonic()
+        """Начало долгой операции: отсчёт WORK_SLICE и счётчики начинаются заново."""
+        now = self.reactor.monotonic()
+        self._throttle_t = now
+        self._throttle_start = now
+        self._throttle_yields = 0
+        self._throttle_spent = 0.0
 
     def _throttle(self):
-        """Вызывать в цикле долгой операции. Если реактор занят дольше WORK_SLICE - короткая пауза."""
+        """Вызывать в цикле долгой операции. Если реактор занят дольше WORK_SLICE - отдать управление реактору."""
         now = self.reactor.monotonic()
         if now - self._throttle_t >= WORK_SLICE:
-            self.reactor.pause(now + THROTTLE_PAUSE)
-            self._throttle_t = self.reactor.monotonic()
+            self.reactor.pause(self.reactor.NOW)
+            after = self.reactor.monotonic()
+            self._throttle_yields += 1
+            self._throttle_spent += after - now
+            self._throttle_t = after
+
+    def _throttle_done(self, label):
+        """Конец долгой операции: итог в klippy.log (сколько раз отдавали управление и сколько это стоило)."""
+        total = self.reactor.monotonic() - self._throttle_start
+        logging.info("zmod throttle [%s]: %d yields, %.2f s in yields, %.2f s total",
+                     label, self._throttle_yields, self._throttle_spent, total)
 
     # PLATE
     def cmd_SDCARD_PRINT_FILE_MF(self, gcmd):
@@ -247,6 +259,7 @@ class zmod:
                             break
                         target.write(chunk)
                         self._throttle()
+                    self._throttle_done("3mf unzip")
 
                 gcmd.respond_raw(f"// 3MF: Check MD5 {fname}[{plate_num}]...")
                 md5_hash = hashlib.md5()
@@ -258,6 +271,7 @@ class zmod:
                             break
                         md5_hash.update(chunk)
                         self._throttle()
+                    self._throttle_done("3mf md5")
 
                 current_md5 = md5_hash.hexdigest().lower()
 
@@ -485,6 +499,7 @@ class zmod:
                         y_min = min(y_min, min(ys))
                         y_max = max(y_max, max(ys))
                         found = True
+                self._throttle_done("ZEXCLUDE scan")
 
         except FileNotFoundError:
             gcmd.respond_raw(f"ZEXCLUDE: File not found: {full_path}")
