@@ -14,6 +14,7 @@ if  [ "$1" == 1 ]; then
     find /opt/config/ -name '*.tgz' -exec rm {} \;
     find ${DATA_GCODES}/timelapse -type f -name '*.mp4' -exec rm {} \;
     find ${DATA_GCODES}/timelapse -type f -name '*.jpg' -exec rm {} \;
+    rm -rf ${DATA_GCODES}/3mf_print
     sync
 fi
 
