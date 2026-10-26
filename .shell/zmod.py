@@ -330,10 +330,6 @@ class zmod:
 
         plate_num = self.get_plate(gcmd, filename)
 
-        # Fix Orca bug
-        if plate_num != 1:
-            return
-
         try:
             with ZipFile(full_path, 'r') as zip_ref:
                 file_list = zip_ref.namelist()
@@ -352,14 +348,16 @@ class zmod:
                     return
 
                 x_min, y_min, x_max, y_max = float(bbox_all[0]), float(bbox_all[1]), float(bbox_all[2]), float(bbox_all[3])
-
-                exclude_cmd = (
-                    f"_SET_FAST_KAMP "
-                    f"X_START={x_min:.4f} Y_START={y_min:.4f} "
-                    f"X_END={x_max:.4f} Y_END={y_max:.4f} "
-                    "FROM=ZEXCLUDE_MF"
-                )
-                self.gcode.run_script_from_command(exclude_cmd)
+                if all(0 < coord < 256 for coord in (x_min, y_min, x_max, y_max)):
+                    exclude_cmd = (
+                        f"_SET_FAST_KAMP "
+                        f"X_START={x_min:.4f} Y_START={y_min:.4f} "
+                        f"X_END={x_max:.4f} Y_END={y_max:.4f} "
+                        "FROM=ZEXCLUDE_MF"
+                    )
+                    self.gcode.run_script_from_command(exclude_cmd)
+                else:
+                    gcmd.respond_raw(f"!! ZEXCLUDE_MF: Update Orca Slicer >= 2.5.0 !!")
 
         except FileNotFoundError:
             gcmd.respond_raw(f"ZEXCLUDE_MF: File not found: {full_path}")
