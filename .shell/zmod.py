@@ -302,7 +302,7 @@ class zmod:
                 self._yield_reactor(METADATA_PAUSE_TIME)
 
                 # Загружаем быстрые исключения
-                self.ZEXCLUDE_MF(gcmd)
+                self.cmd_ZEXCLUDE_MF(gcmd)
             return rel_gcode
         except Exception as e:
             if str(e).startswith("INVALID_PLATE_NUM"):
